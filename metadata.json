@@ -1,0 +1,8 @@
+{
+  "name": "Loops",
+  "description": "A high-fidelity relationship management and networking AI assistant featuring dashboard analytics, network visualization, smart scanning, and AI-driven context tools.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
