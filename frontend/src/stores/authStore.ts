@@ -10,6 +10,7 @@ interface AuthState {
   // Actions
   initialize: () => Promise<void>
   demoLogin: () => Promise<boolean>
+  updateUser: (data: { name?: string; avatarUrl?: string; bio?: string }) => Promise<boolean>
   logout: () => void
   clearError: () => void
 }
@@ -44,6 +45,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({
         user: result.data.user,
         isAuthenticated: true,
+        isLoading: false,
+      })
+      return true
+    } else {
+      set({ error: result.error, isLoading: false })
+      return false
+    }
+  },
+
+  updateUser: async (data: { name?: string; avatarUrl?: string; bio?: string }) => {
+    set({ isLoading: true, error: null })
+    const result = await authApi.updateMe(data)
+
+    if (result.data) {
+      set({
+        user: result.data,
         isLoading: false,
       })
       return true

@@ -1,0 +1,41 @@
+{
+  "id": "com.warmly.app",
+  "appName": "Warmly",
+  "platformVersion": "7.4.4",
+  "title": "Warmly - Personal CRM",
+  "description": "Personal CRM for meaningful connections",
+  "version": "1.0.0",
+  "build": "1",
+  "author": "Warmly Team",
+  "email": "chester.kuo1978@gmail.com",
+
+  "release": "release",
+  "platform": ["ios"],
+
+  "iosPackageType": "app-store",
+  "iosDistP12": "certificates/ios_distribution.p12",
+  "iosDistP12Password": "8ephegcn",
+  "iosDistribution": "certificates/MyWarmly_App_profile.mobileprovision",
+
+  "ios": {
+    "developmentTeam": "76TVWYJ6PL",
+    "scheme": "App",
+    "buildNumber": "1"
+  },
+
+  "webDir": "dist",
+  "orientation": "portrait",
+
+  "preferences": {
+    "StatusBarOverlaysWebView": "false",
+    "StatusBarBackgroundColor": "#122017",
+    "StatusBarStyle": "lightcontent",
+    "DisallowOverscroll": "true",
+    "BackupWebStorage": "local",
+    "SplashMaintainAspectRatio": "true",
+    "FadeSplashScreenDuration": "300",
+    "SplashShowOnlyFirstTime": "false",
+    "SplashScreen": "screen",
+    "SplashScreenDelay": "2000"
+  }
+}

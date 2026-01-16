@@ -3,6 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { ScreenName } from '../App';
 import { useContactStore } from '../stores/contactStore';
 import { contactsApi, Contact } from '../services/api';
+import {
+  decodeQRFromImage,
+  parseQRCodeUrl,
+  qrContactToFormData,
+  getQRTypeDisplayName,
+  getQRTypeIcon,
+  QRContactData
+} from '../utils/qrCodeParser';
 
 interface ScanCardProps {
   onNavigate: (screen: ScreenName) => void;
@@ -23,7 +31,8 @@ const ScanCard: React.FC<ScanCardProps> = ({ onNavigate }) => {
   // Batch Mode State
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [batchCount, setBatchCount] = useState(0);
-  const [flashActive, setFlashActive] = useState(false);
+  const [torchActive, setTorchActive] = useState(false);
+  const [showFlashEffect, setShowFlashEffect] = useState(false);
 
   // Copy Feedback State
   const [copied, setCopied] = useState(false);
@@ -37,13 +46,25 @@ const ScanCard: React.FC<ScanCardProps> = ({ onNavigate }) => {
   // Preview image
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
+  // QR Code State
+  const [qrDetected, setQrDetected] = useState<QRContactData | null>(null);
+
+  // Live Camera State
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
   const [contactData, setContactData] = useState({
     name: '',
     title: '',
     company: '',
     department: '',
     phone: '',
-    email: ''
+    email: '',
+    notes: '',
+    social: {} as { line?: string; telegram?: string; whatsapp?: string; wechat?: string }
   });
 
   // Restore draft on mount
@@ -69,6 +90,129 @@ const ScanCard: React.FC<ScanCardProps> = ({ onNavigate }) => {
     }
   }, [contactData, isScanned]);
 
+  // Cleanup camera on unmount
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
+
+  const startCamera = async () => {
+    try {
+      setCameraError(null);
+      console.log('Starting camera...');
+
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error('getUserMedia not supported');
+        setCameraError(t('scanCard.cameraPermission'));
+        return;
+      }
+
+      console.log('Requesting camera access...');
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' }, // Use back camera, fallback to any
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+      console.log('Camera stream obtained:', stream);
+
+      if (videoRef.current) {
+        console.log('Setting video srcObject...');
+        videoRef.current.srcObject = stream;
+        streamRef.current = stream;
+
+        // Set camera active first so video element is visible (required for iOS)
+        setIsCameraActive(true);
+
+        // Then play the video
+        try {
+          await videoRef.current.play();
+          console.log('Video playing successfully');
+        } catch (playErr) {
+          console.error('Failed to play video:', playErr);
+          // Try again with a small delay (iOS sometimes needs this)
+          setTimeout(async () => {
+            try {
+              if (videoRef.current) {
+                await videoRef.current.play();
+                console.log('Video playing after retry');
+              }
+            } catch (retryErr) {
+              console.error('Retry failed:', retryErr);
+              setCameraError(t('scanCard.cameraPermission'));
+            }
+          }, 100);
+        }
+      } else {
+        console.error('videoRef.current is null');
+        setCameraError(t('scanCard.cameraPermission'));
+      }
+    } catch (err: any) {
+      console.error('Failed to access camera:', err);
+      // More specific error messages
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setCameraError(t('scanCard.cameraPermission'));
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        setCameraError('No camera found');
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        setCameraError('Camera is in use by another app');
+      } else {
+        setCameraError(t('scanCard.cameraPermission'));
+      }
+      setIsCameraActive(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setIsCameraActive(false);
+    setTorchActive(false);
+  };
+
+  const toggleFlash = async () => {
+    if (!streamRef.current) return;
+
+    const track = streamRef.current.getVideoTracks()[0];
+    if (!track) return;
+
+    try {
+      const capabilities = track.getCapabilities() as any;
+      if (capabilities.torch) {
+        const newTorchState = !torchActive;
+        await track.applyConstraints({
+          advanced: [{ torch: newTorchState } as any]
+        });
+        setTorchActive(newTorchState);
+      } else {
+        console.log('Torch not supported on this device');
+      }
+    } catch (err) {
+      console.error('Failed to toggle flash:', err);
+    }
+  };
+
+  const captureFrame = (): string | null => {
+    if (!videoRef.current || !canvasRef.current) return null;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.drawImage(video, 0, 0);
+    return canvas.toDataURL('image/jpeg', 0.9);
+  };
+
   const validateEmail = (email: string) => {
     // Basic email regex
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -83,9 +227,90 @@ const ScanCard: React.FC<ScanCardProps> = ({ onNavigate }) => {
     return true;
   };
 
-  const handleScan = () => {
-    // Trigger file input to select/capture image
-    fileInputRef.current?.click();
+  const handleScan = async () => {
+    // If camera is active, capture from video stream
+    if (isCameraActive && videoRef.current) {
+      const base64 = captureFrame();
+      if (!base64) {
+        // Fallback to file input
+        fileInputRef.current?.click();
+        return;
+      }
+
+      // Show flash effect
+      setShowFlashEffect(true);
+      setTimeout(() => setShowFlashEffect(false), 200);
+
+      // Set preview image
+      setPreviewImage(base64);
+
+      // Remove the data URL prefix for API
+      const base64Data = base64.split(',')[1];
+
+      if (isBatchMode) {
+        setBatchCount(prev => prev + 1);
+        return;
+      }
+
+      setIsScanning(true);
+      setScanError(null);
+      setQrDetected(null);
+
+      // Try QR code detection first
+      try {
+        const qrContent = await decodeQRFromImage(base64);
+
+        if (qrContent) {
+          const qrData = parseQRCodeUrl(qrContent);
+
+          if (qrData && qrData.type !== 'unknown') {
+            setQrDetected(qrData);
+            const parsedContact = qrContactToFormData(qrData);
+
+            setContactData({
+              name: parsedContact.name || '',
+              title: '',
+              company: '',
+              department: '',
+              phone: parsedContact.phone || '',
+              email: '',
+              notes: parsedContact.notes || '',
+              social: parsedContact.social || {}
+            });
+            setIsScanned(true);
+            setIsScanning(false);
+            stopCamera(); // Stop camera after successful scan
+            return;
+          }
+        }
+      } catch (qrError) {
+        console.log('QR decode failed, trying OCR...', qrError);
+      }
+
+      // No QR code found - fall back to OCR scan
+      const result = await scanCard(base64Data);
+
+      if (result) {
+        setContactData({
+          name: result.name || '',
+          title: result.title || '',
+          company: result.company || '',
+          department: result.department || '',
+          phone: result.phone || '',
+          email: result.email || '',
+          notes: '',
+          social: {}
+        });
+        setIsScanned(true);
+        stopCamera(); // Stop camera after successful scan
+      } else {
+        setScanError(t('scanCard.scanFailed'));
+      }
+      setIsScanning(false);
+    } else {
+      // Fallback to file input if camera not available
+      fileInputRef.current?.click();
+    }
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -93,8 +318,8 @@ const ScanCard: React.FC<ScanCardProps> = ({ onNavigate }) => {
     if (!file) return;
 
     // Show flash effect
-    setFlashActive(true);
-    setTimeout(() => setFlashActive(false), 200);
+    setShowFlashEffect(true);
+    setTimeout(() => setShowFlashEffect(false), 200);
 
     // Convert to base64 and show preview
     const reader = new FileReader();
@@ -112,10 +337,45 @@ const ScanCard: React.FC<ScanCardProps> = ({ onNavigate }) => {
         return;
       }
 
-      // Scan with AI
       setIsScanning(true);
       setScanError(null);
+      setQrDetected(null);
 
+      // Try QR code detection first
+      try {
+        const qrContent = await decodeQRFromImage(base64);
+
+        if (qrContent) {
+          const qrData = parseQRCodeUrl(qrContent);
+
+          if (qrData && qrData.type !== 'unknown') {
+            // QR code detected - parse contact info
+            setQrDetected(qrData);
+            const parsedContact = qrContactToFormData(qrData);
+
+            setContactData({
+              name: parsedContact.name || '',
+              title: '',
+              company: '',
+              department: '',
+              phone: parsedContact.phone || '',
+              email: '',
+              notes: parsedContact.notes || '',
+              social: parsedContact.social || {}
+            });
+            setIsScanned(true);
+            setIsScanning(false);
+
+            // Reset file input
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+          }
+        }
+      } catch (qrError) {
+        console.log('QR decode failed, trying OCR...', qrError);
+      }
+
+      // No QR code found - fall back to OCR scan
       const result = await scanCard(base64Data);
 
       if (result) {
@@ -126,6 +386,8 @@ const ScanCard: React.FC<ScanCardProps> = ({ onNavigate }) => {
           department: result.department || '',
           phone: result.phone || '',
           email: result.email || '',
+          notes: '',
+          social: {}
         });
         setIsScanned(true);
       } else {
@@ -144,6 +406,7 @@ const ScanCard: React.FC<ScanCardProps> = ({ onNavigate }) => {
     setEmailError(null);
     setScanError(null);
     setPreviewImage(null);
+    setQrDetected(null);
     localStorage.removeItem(STORAGE_KEY); // Clear draft
     // Reset contact data
     setContactData({
@@ -152,12 +415,29 @@ const ScanCard: React.FC<ScanCardProps> = ({ onNavigate }) => {
       company: '',
       department: '',
       phone: '',
-      email: ''
+      email: '',
+      notes: '',
+      social: {}
     });
+    // Restart camera
+    startCamera();
   };
 
   const handleSave = async () => {
     if (validateEmail(contactData.email)) {
+      // Build notes with social links if from QR code
+      let notes = contactData.notes || '';
+      if (contactData.social) {
+        const socialLinks: string[] = [];
+        if (contactData.social.line) socialLinks.push(`LINE: ${contactData.social.line}`);
+        if (contactData.social.telegram) socialLinks.push(`Telegram: @${contactData.social.telegram}`);
+        if (contactData.social.whatsapp) socialLinks.push(`WhatsApp: ${contactData.social.whatsapp}`);
+        if (contactData.social.wechat) socialLinks.push(`WeChat: ${contactData.social.wechat}`);
+        if (socialLinks.length > 0 && !notes.includes('LINE:') && !notes.includes('Telegram:')) {
+          notes = socialLinks.join('\n') + (notes ? '\n' + notes : '');
+        }
+      }
+
       const newContact = await createContact({
         name: contactData.name,
         title: contactData.title,
@@ -165,11 +445,13 @@ const ScanCard: React.FC<ScanCardProps> = ({ onNavigate }) => {
         department: contactData.department,
         phone: contactData.phone,
         email: contactData.email,
-        source: 'business_card_scan',
+        notes: notes,
+        source: qrDetected ? 'card_scan' : 'card_scan',
       });
 
       if (newContact) {
         localStorage.removeItem(STORAGE_KEY); // Clear draft on save
+        setQrDetected(null);
         setSelectedContact(newContact);
         onNavigate('profile');
       }
@@ -294,10 +576,10 @@ END:VCARD`;
         onChange={handleFileSelect}
       />
 
-      {/* Camera Viewport (Top 65%) */}
-      <div className="relative w-full h-[65%] shrink-0 bg-neutral-900 overflow-hidden rounded-b-3xl shadow-2xl z-10">
+      {/* Camera Viewport - fullscreen when camera active, 65% otherwise */}
+      <div className={`relative w-full bg-neutral-900 overflow-hidden shadow-2xl z-10 transition-all duration-300 ${isCameraActive && !isScanned ? 'h-full rounded-none' : 'h-[65%] shrink-0 rounded-b-3xl'}`}>
         {/* Flash Effect Overlay */}
-        <div className={`absolute inset-0 bg-white z-50 pointer-events-none transition-opacity duration-200 ${flashActive ? 'opacity-80' : 'opacity-0'}`}></div>
+        <div className={`absolute inset-0 bg-white z-50 pointer-events-none transition-opacity duration-200 ${showFlashEffect ? 'opacity-80' : 'opacity-0'}`}></div>
 
         {/* Scanning Overlay */}
         {isScanning && (
@@ -308,16 +590,64 @@ END:VCARD`;
           </div>
         )}
 
-        {/* Preview or placeholder image */}
+        {/* QR Code Detected Badge */}
+        {qrDetected && isScanned && (
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-30 bg-primary/90 backdrop-blur-md text-black px-4 py-2 rounded-full flex items-center gap-2 shadow-lg animate-fade-in">
+            <span className="material-symbols-outlined text-lg">{getQRTypeIcon(qrDetected.type)}</span>
+            <span className="text-sm font-bold">{getQRTypeDisplayName(qrDetected.type)} {t('scanCard.qrDetected')}</span>
+          </div>
+        )}
+
+        {/* Hidden canvas for frame capture */}
+        <canvas ref={canvasRef} className="hidden" />
+
+        {/* Preview or live camera */}
         <div className="absolute inset-0 w-full h-full">
-          <div className="absolute inset-0 bg-black/20 z-10"></div>
+          {/* Live camera video - always rendered, visibility controlled via opacity */}
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{
+              opacity: isCameraActive && !previewImage ? 1 : 0,
+              zIndex: isCameraActive && !previewImage ? 5 : -1
+            }}
+          />
+
+          {/* Dark overlay on top of video */}
+          {isCameraActive && !previewImage && (
+            <div className="absolute inset-0 bg-black/20 z-10 pointer-events-none"></div>
+          )}
+
           {previewImage ? (
-            <img src={previewImage} alt="Scanned card" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
+            <img src={previewImage} alt="Scanned card" className="w-full h-full object-cover z-5" />
+          ) : cameraError ? (
+            <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900 z-5">
+              <div className="text-center px-6">
+                <span className="material-symbols-outlined text-[64px] text-red-500 mb-2">videocam_off</span>
+                <p className="text-red-400 text-sm font-medium mb-4">{cameraError}</p>
+                <button
+                  onClick={startCamera}
+                  className="px-4 py-2 bg-primary text-black rounded-lg font-bold text-sm"
+                >
+                  {t('common.retake')}
+                </button>
+              </div>
+            </div>
+          ) : !isCameraActive && (
+            /* Tap to start camera - required for iOS Safari */
+            <div
+              className="absolute inset-0 w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900 cursor-pointer active:bg-gray-800 z-5"
+              onClick={startCamera}
+            >
               <div className="text-center">
-                <span className="material-symbols-outlined text-[64px] text-gray-600 mb-2">photo_camera</span>
-                <p className="text-gray-500 text-sm">{t('scanCard.tapToScan')}</p>
+                <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4 hover:bg-primary/30 active:scale-95 transition-all border-2 border-primary/30">
+                  <span className="material-symbols-outlined text-[56px] text-primary">photo_camera</span>
+                </div>
+                <p className="text-white text-lg font-bold mb-2">{t('scanCard.tapToScan')}</p>
+                <p className="text-gray-400 text-sm">{t('scanCard.alignCard')}</p>
               </div>
             </div>
           )}
@@ -331,8 +661,11 @@ END:VCARD`;
           <h2 className="text-white text-lg font-bold tracking-tight drop-shadow-md">
             {isBatchMode && batchCount > 0 ? t('scanCard.batchScan', { count: batchCount }) : t('scanCard.title')}
           </h2>
-          <button className="flex size-10 shrink-0 items-center justify-center rounded-full bg-transparent text-white hover:bg-white/10 transition-colors">
-            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>flash_on</span>
+          <button
+            onClick={toggleFlash}
+            className={`flex size-10 shrink-0 items-center justify-center rounded-full transition-colors ${torchActive ? 'bg-primary text-black' : 'bg-transparent text-white hover:bg-white/10'}`}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>{torchActive ? 'flash_on' : 'flash_off'}</span>
           </button>
         </div>
 
@@ -347,7 +680,7 @@ END:VCARD`;
               </div>
             )}
 
-            {!isBatchMode && (
+            {!isBatchMode && isCameraActive && (
               <div className="flex gap-2 mb-4 animate-pulse">
                 <div className="flex h-8 items-center justify-center gap-x-1.5 rounded-full bg-white/90 backdrop-blur pl-3 pr-4 shadow-lg border border-primary/20">
                   <span className="material-symbols-outlined text-primary" style={{ fontSize: '18px' }}>check_circle</span>
@@ -359,23 +692,42 @@ END:VCARD`;
                 </div>
               </div>
             )}
-            
-            <div className={`relative w-[85%] aspect-[1.586/1] rounded-xl border-2 shadow-[0_0_0_999px_rgba(0,0,0,0.4)] transition-colors duration-300 ${isBatchMode ? 'border-primary/60' : 'border-white/40'}`}>
-              <div className="absolute -top-0.5 -left-0.5 w-6 h-6 border-t-4 border-l-4 border-primary rounded-tl-lg"></div>
-              <div className="absolute -top-0.5 -right-0.5 w-6 h-6 border-t-4 border-r-4 border-primary rounded-tr-lg"></div>
-              <div className="absolute -bottom-0.5 -left-0.5 w-6 h-6 border-b-4 border-l-4 border-primary rounded-bl-lg"></div>
-              <div className="absolute -bottom-0.5 -right-0.5 w-6 h-6 border-b-4 border-r-4 border-primary rounded-br-lg"></div>
+
+            {isCameraActive && (
+              <div className={`relative w-[85%] aspect-[1.586/1] rounded-xl border-2 shadow-[0_0_0_999px_rgba(0,0,0,0.4)] transition-colors duration-300 ${isBatchMode ? 'border-primary/60' : 'border-white/40'}`}>
+                <div className="absolute -top-0.5 -left-0.5 w-6 h-6 border-t-4 border-l-4 border-primary rounded-tl-lg"></div>
+                <div className="absolute -top-0.5 -right-0.5 w-6 h-6 border-t-4 border-r-4 border-primary rounded-tr-lg"></div>
+                <div className="absolute -bottom-0.5 -left-0.5 w-6 h-6 border-b-4 border-l-4 border-primary rounded-bl-lg"></div>
+                <div className="absolute -bottom-0.5 -right-0.5 w-6 h-6 border-b-4 border-r-4 border-primary rounded-br-lg"></div>
+              </div>
+            )}
+
+            {isCameraActive && (
+              <p className="mt-6 text-white/90 text-sm font-medium drop-shadow-md text-center max-w-[200px]">
+                {isBatchMode ? t('scanCard.keepScanning') : t('scanCard.alignCard')}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Floating Capture Button - visible when camera is active */}
+        {isCameraActive && !isScanned && (
+          <div className="absolute bottom-6 left-0 right-0 z-30 flex items-center justify-center pointer-events-auto">
+            <div className="relative group cursor-pointer" onClick={handleScan}>
+              <div className={`size-20 rounded-full border-4 flex items-center justify-center bg-black/30 backdrop-blur-sm active:scale-95 transition-all duration-200 ${isBatchMode ? 'border-primary' : 'border-white'}`}>
+                <div className={`size-16 rounded-full shadow-lg flex items-center justify-center transition-colors ${isBatchMode ? 'bg-primary shadow-primary/30 hover:bg-white hover:text-primary' : 'bg-white shadow-white/30 hover:bg-primary'}`}>
+                  <span className={`material-symbols-outlined text-3xl ${isBatchMode ? 'text-black' : 'text-black hover:text-white'}`}>
+                    {isBatchMode ? 'add_a_photo' : 'photo_camera'}
+                  </span>
+                </div>
+              </div>
             </div>
-            
-            <p className="mt-6 text-white/90 text-sm font-medium drop-shadow-md text-center max-w-[200px]">
-              {isBatchMode ? t('scanCard.keepScanning') : t('scanCard.alignCard')}
-            </p>
           </div>
         )}
       </div>
 
-      {/* Controls (Bottom 35%) */}
-      <div className="flex-1 flex flex-col bg-background-dark relative z-0 -mt-6 pt-10 pb-6 px-6 overflow-y-auto">
+      {/* Controls (Bottom 35%) - hidden when camera is active for cleaner UX */}
+      <div className={`flex-1 flex flex-col bg-background-dark relative z-0 -mt-6 pt-10 pb-6 px-6 overflow-y-auto ${isCameraActive && !isScanned ? 'hidden' : ''}`}>
         {isScanned && !isBatchMode ? (
           <div className="flex flex-col gap-4 animate-fade-in pb-4">
             <div className="flex items-center justify-between mb-1">
@@ -402,7 +754,7 @@ END:VCARD`;
 
               <div className="grid grid-cols-2 gap-3">
                  <div>
-                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider ml-1 mb-1 block">{t('scanCard.title')}</label>
+                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider ml-1 mb-1 block">{t('scanCard.jobTitle')}</label>
                     <input
                       type="text"
                       value={contactData.title}
@@ -445,10 +797,10 @@ END:VCARD`;
               <div>
                 <label className={`text-[10px] font-bold uppercase tracking-wider ml-1 mb-1 block ${emailError ? 'text-red-500' : 'text-gray-400'}`}>{t('scanCard.email')}</label>
                 <div className="relative">
-                  <input 
+                  <input
                      ref={emailInputRef}
                      type="email"
-                     value={contactData.email} 
+                     value={contactData.email}
                      onChange={(e) => {
                        setContactData({...contactData, email: e.target.value});
                        if (emailError) validateEmail(e.target.value);
@@ -457,14 +809,14 @@ END:VCARD`;
                      className={`w-full bg-[#2C3435] border ${emailError ? 'border-red-500 focus:border-red-500' : 'border-gray-700 focus:border-primary'} rounded-xl pl-4 pr-24 py-3 text-white focus:outline-none transition-colors text-sm font-medium`}
                   />
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                    <button 
+                    <button
                       onClick={() => emailInputRef.current?.focus()}
                       className="text-gray-400 hover:text-white transition-colors"
                       title="Type email"
                     >
                       <span className="material-symbols-outlined text-[20px]">keyboard</span>
                     </button>
-                    <button 
+                    <button
                       onClick={handleVoiceInput}
                       className={`transition-all ${isListening ? 'text-red-500 animate-pulse scale-110' : 'text-gray-400 hover:text-white'}`}
                       title="Speak email"
@@ -480,6 +832,46 @@ END:VCARD`;
                   </p>
                 )}
               </div>
+
+              {/* Social Media Links (shown when QR code detected) */}
+              {qrDetected && (
+                <div className="pt-2 border-t border-gray-700">
+                  <label className="text-[10px] text-primary font-bold uppercase tracking-wider ml-1 mb-2 block flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">qr_code</span>
+                    {t('scanCard.socialLinks')}
+                  </label>
+                  <div className="space-y-2">
+                    {contactData.social?.line && (
+                      <div className="flex items-center gap-3 bg-[#06C755]/10 border border-[#06C755]/30 rounded-xl px-4 py-2.5">
+                        <span className="text-[#06C755] font-bold text-sm">LINE</span>
+                        <span className="text-white text-sm flex-1">{contactData.social.line}</span>
+                        <span className="material-symbols-outlined text-[#06C755] text-lg">check_circle</span>
+                      </div>
+                    )}
+                    {contactData.social?.telegram && (
+                      <div className="flex items-center gap-3 bg-[#0088cc]/10 border border-[#0088cc]/30 rounded-xl px-4 py-2.5">
+                        <span className="text-[#0088cc] font-bold text-sm">Telegram</span>
+                        <span className="text-white text-sm flex-1">@{contactData.social.telegram}</span>
+                        <span className="material-symbols-outlined text-[#0088cc] text-lg">check_circle</span>
+                      </div>
+                    )}
+                    {contactData.social?.whatsapp && (
+                      <div className="flex items-center gap-3 bg-[#25D366]/10 border border-[#25D366]/30 rounded-xl px-4 py-2.5">
+                        <span className="text-[#25D366] font-bold text-sm">WhatsApp</span>
+                        <span className="text-white text-sm flex-1">{contactData.social.whatsapp}</span>
+                        <span className="material-symbols-outlined text-[#25D366] text-lg">check_circle</span>
+                      </div>
+                    )}
+                    {contactData.social?.wechat && (
+                      <div className="flex items-center gap-3 bg-[#07C160]/10 border border-[#07C160]/30 rounded-xl px-4 py-2.5">
+                        <span className="text-[#07C160] font-bold text-sm">WeChat</span>
+                        <span className="text-white text-sm flex-1">{contactData.social.wechat}</span>
+                        <span className="material-symbols-outlined text-[#07C160] text-lg">check_circle</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
             
             <button onClick={handleSave} className="mt-2 w-full bg-primary text-black font-bold py-3.5 rounded-xl hover:bg-primary-dark transition-colors shadow-lg shadow-primary/20 flex items-center justify-center gap-2">

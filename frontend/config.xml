@@ -1,0 +1,63 @@
+<?xml version='1.0' encoding='utf-8'?>
+<widget id="com.warmly.app" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+    <name>Warmly</name>
+    <description>Personal CRM for meaningful connections</description>
+    <author email="support@mywarmly.app" href="https://mywarmly.app">Warmly Team</author>
+    <content src="index.html" />
+
+    <!-- Global Preferences -->
+    <preference name="DisallowOverscroll" value="true" />
+    <preference name="Orientation" value="portrait" />
+    <preference name="BackgroundColor" value="#122017" />
+    <preference name="SplashScreenDelay" value="2000" />
+    <preference name="FadeSplashScreen" value="true" />
+    <preference name="FadeSplashScreenDuration" value="500" />
+    <preference name="ShowSplashScreenSpinner" value="false" />
+    <preference name="AutoHideSplashScreen" value="true" />
+
+    <!-- iOS Platform Preferences -->
+    <platform name="ios">
+        <preference name="deployment-target" value="13.0" />
+        <preference name="WKWebViewOnly" value="true" />
+        <preference name="CordovaWebViewEngine" value="CDVWKWebViewEngine" />
+        <preference name="SwiftVersion" value="5" />
+        <preference name="StatusBarStyle" value="lightcontent" />
+        <preference name="StatusBarOverlaysWebView" value="false" />
+        <preference name="StatusBarBackgroundColor" value="#122017" />
+        <preference name="AllowInlineMediaPlayback" value="true" />
+        <preference name="MediaTypesRequiringUserActionForPlayback" value="none" />
+        <preference name="SuppressesIncrementalRendering" value="false" />
+        <preference name="KeyboardDisplayRequiresUserAction" value="false" />
+        <preference name="EnableViewportScale" value="true" />
+
+        <!-- App Icons -->
+        <icon src="public/icons/icon-40.png" width="40" height="40" />
+        <icon src="public/icons/icon-58.png" width="58" height="58" />
+        <icon src="public/icons/icon-60.png" width="60" height="60" />
+        <icon src="public/icons/icon-76.png" width="76" height="76" />
+        <icon src="public/icons/icon-80.png" width="80" height="80" />
+        <icon src="public/icons/icon-87.png" width="87" height="87" />
+        <icon src="public/icons/icon-120.png" width="120" height="120" />
+        <icon src="public/icons/icon-152.png" width="152" height="152" />
+        <icon src="public/icons/icon-167.png" width="167" height="167" />
+        <icon src="public/icons/icon-180.png" width="180" height="180" />
+        <icon src="public/icons/icon-512.png" width="512" height="512" />
+        <icon src="public/icons/icon-1024.png" width="1024" height="1024" />
+    </platform>
+
+    <!-- Access and Navigation -->
+    <access origin="*" />
+    <allow-navigation href="https://mywarmly.app/*" />
+    <allow-navigation href="https://fonts.googleapis.com/*" />
+    <allow-navigation href="https://fonts.gstatic.com/*" />
+    <allow-intent href="http://*/*" />
+    <allow-intent href="https://*/*" />
+    <allow-intent href="tel:*" />
+    <allow-intent href="sms:*" />
+    <allow-intent href="mailto:*" />
+
+    <!-- Plugins -->
+    <plugin name="cordova-plugin-splashscreen" spec="^6.0.0" />
+    <plugin name="cordova-plugin-statusbar" spec="^4.0.0" />
+    <plugin name="cordova-plugin-wkwebview-engine" spec="^1.2.2" />
+</widget>

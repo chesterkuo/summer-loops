@@ -1,6 +1,15 @@
 // API Client for Warmly Backend
 
-const API_BASE = '/api'
+// Detect native vs web environment for API base URL
+const isNative = typeof window !== 'undefined' && (
+  window.location.protocol === 'capacitor:' ||
+  window.location.protocol === 'file:' ||
+  window.location.hostname === 'localhost' && window.location.port === ''
+);
+
+const API_BASE = isNative
+  ? 'https://mywarmly.app/api'  // Production API URL for native app
+  : '/api';  // Relative for web (proxied in dev)
 
 // Token management
 let authToken: string | null = localStorage.getItem('token')
@@ -56,6 +65,7 @@ export interface User {
   email: string
   name: string
   avatarUrl?: string
+  bio?: string
 }
 
 export interface Contact {
@@ -73,6 +83,14 @@ export interface Contact {
   source: string | null
   created_at: string
   updated_at: string
+  // Social media
+  line_id: string | null
+  telegram_username: string | null
+  whatsapp_number: string | null
+  wechat_id: string | null
+  twitter_handle: string | null
+  facebook_url: string | null
+  instagram_handle: string | null
 }
 
 export interface Relationship {
@@ -148,6 +166,13 @@ export const authApi = {
 
   async getMe() {
     return apiFetch<User>('/auth/me')
+  },
+
+  async updateMe(data: { name?: string; avatarUrl?: string; bio?: string }) {
+    return apiFetch<User>('/auth/me', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
   },
 
   async logout() {
@@ -256,6 +281,8 @@ export const pathsApi = {
     path: { name: string; company?: string; relationship?: string }[]
     goal: string
     tone?: 'formal' | 'casual' | 'brief'
+    senderName?: string
+    senderBio?: string
   }) {
     return apiFetch<{ message: string }>('/paths/generate-message', {
       method: 'POST',
@@ -549,5 +576,90 @@ export const contactsExtendedApi = {
       method: 'POST',
       body: JSON.stringify({ linkedinUrl }),
     })
+  },
+}
+
+// Teams API
+export interface Team {
+  id: string
+  name: string
+  owner_id: string
+  created_at: string
+  role?: string
+  member_count?: number
+  contact_count?: number
+}
+
+export interface TeamMember {
+  id: string
+  name: string
+  email: string
+  avatar_url: string | null
+  role: 'owner' | 'admin' | 'member'
+}
+
+export interface SharedContact {
+  id: string
+  name: string
+  company: string | null
+  title: string | null
+  email: string | null
+  phone: string | null
+  visibility: 'basic' | 'full'
+  shared_by_name: string
+  shared_by_id: string
+}
+
+export const teamsApi = {
+  async list() {
+    return apiFetch<Team[]>('/teams')
+  },
+
+  async get(id: string) {
+    return apiFetch<Team & { members: TeamMember[]; currentUserRole: string }>(`/teams/${id}`)
+  },
+
+  async create(data: { name: string }) {
+    return apiFetch<Team>('/teams', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  async update(id: string, data: { name?: string }) {
+    return apiFetch<Team>(`/teams/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  },
+
+  async delete(id: string) {
+    return apiFetch(`/teams/${id}`, { method: 'DELETE' })
+  },
+
+  async addMember(teamId: string, data: { email: string; role?: 'admin' | 'member' }) {
+    return apiFetch<{ userId: string; role: string }>(`/teams/${teamId}/members`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  async removeMember(teamId: string, memberId: string) {
+    return apiFetch(`/teams/${teamId}/members/${memberId}`, { method: 'DELETE' })
+  },
+
+  async shareContact(teamId: string, data: { contactId: string; visibility?: 'basic' | 'full' }) {
+    return apiFetch(`/teams/${teamId}/share`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  async unshareContact(teamId: string, contactId: string) {
+    return apiFetch(`/teams/${teamId}/share/${contactId}`, { method: 'DELETE' })
+  },
+
+  async getContacts(teamId: string) {
+    return apiFetch<SharedContact[]>(`/teams/${teamId}/contacts`)
   },
 }

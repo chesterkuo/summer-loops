@@ -13,8 +13,8 @@ export function initGemini(): boolean {
   }
 
   genAI = new GoogleGenerativeAI(GEMINI_API_KEY)
-  model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-05-20' })
-  visionModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-05-20' })
+  model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+  visionModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
   console.log('Gemini AI initialized')
   return true
 }
@@ -171,14 +171,18 @@ Rules:
 export async function generateIntroMessage(
   path: { name: string; company?: string; relationship?: string }[],
   goal: string,
-  tone: 'formal' | 'casual' | 'brief' = 'formal'
+  tone: 'formal' | 'casual' | 'brief' = 'formal',
+  senderName?: string,
+  senderBio?: string
 ): Promise<string> {
   if (!model) {
     throw new Error('Gemini AI not initialized')
   }
 
+  const requesterName = senderName || path[0]?.name || '我'
+
   const pathDescription = path.map((p, i) => {
-    if (i === 0) return `You (the requester)`
+    if (i === 0) return `${requesterName} (the person writing this message)`
     if (i === path.length - 1) return `${p.name} (target: ${p.company || 'unknown company'})`
     return `${p.name} (${p.company || ''}, ${p.relationship || 'connection'})`
   }).join(' → ')
@@ -189,19 +193,28 @@ export async function generateIntroMessage(
     brief: 'Short and direct, getting straight to the point'
   }
 
+  // Build sender context with bio if available
+  const senderContext = senderBio
+    ? `Sender's background/goal: ${senderBio}`
+    : ''
+
   const prompt = `Generate an introduction request message in Traditional Chinese (繁體中文).
 
 Introduction path: ${pathDescription}
+Sender's name: ${requesterName}
+${senderContext}
 Goal: ${goal}
 Tone: ${toneGuidelines[tone]}
 
 The message should:
 1. Address the first intermediary (${path[1]?.name || 'intermediary'}) respectfully
-2. Reference your relationship with them
-3. Clearly explain why you want an introduction to ${path[path.length - 1]?.name || 'the target'}
-4. State your goal: ${goal}
+2. Reference the relationship between ${requesterName} and them
+3. Clearly explain why ${requesterName} wants an introduction to ${path[path.length - 1]?.name || 'the target'}
+4. State the goal: ${goal}${senderBio ? `\n5. Naturally incorporate the sender's background/purpose: ${senderBio}` : ''}
 5. Be ${tone} in tone
-6. Include a polite closing
+6. Sign off with the sender's actual name: ${requesterName}
+
+IMPORTANT: DO NOT use placeholders like [你的名字], [Your Name], or similar. Always use the actual sender's name "${requesterName}" in the signature.
 
 Return ONLY the message text, no additional formatting or explanation.`
 

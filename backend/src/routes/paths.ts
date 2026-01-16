@@ -19,6 +19,8 @@ interface GenerateMessageRequest {
   path: { name: string; company?: string; relationship?: string }[]
   goal: string
   tone?: 'formal' | 'casual' | 'brief'
+  senderName?: string
+  senderBio?: string
 }
 
 // Search for introduction paths
@@ -82,7 +84,7 @@ paths.post('/generate-message', async (c) => {
   }
 
   try {
-    const message = await generateIntroMessage(body.path, body.goal, body.tone || 'formal')
+    const message = await generateIntroMessage(body.path, body.goal, body.tone || 'formal', body.senderName, body.senderBio)
 
     return c.json({
       data: {

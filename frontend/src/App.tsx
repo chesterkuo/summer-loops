@@ -7,9 +7,11 @@ import VoiceMemo from './screens/VoiceMemo';
 import PathDiscovery from './screens/PathDiscovery';
 import DraftRequest from './screens/DraftRequest';
 import CompanyDetail from './screens/CompanyDetail';
+import Search from './screens/Search';
+import Teams from './screens/Teams';
 
 // Navigation types
-export type ScreenName = 'dashboard' | 'profile' | 'scan' | 'map' | 'voice' | 'path' | 'draft' | 'company';
+export type ScreenName = 'dashboard' | 'profile' | 'scan' | 'map' | 'voice' | 'path' | 'draft' | 'company' | 'search' | 'teams';
 
 const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<ScreenName>('dashboard');
@@ -24,6 +26,8 @@ const App: React.FC = () => {
       case 'path': return <PathDiscovery onNavigate={setCurrentScreen} />;
       case 'draft': return <DraftRequest onNavigate={setCurrentScreen} />;
       case 'company': return <CompanyDetail onNavigate={setCurrentScreen} />;
+      case 'search': return <Search onNavigate={setCurrentScreen} />;
+      case 'teams': return <Teams onNavigate={setCurrentScreen} />;
       default: return <Dashboard onNavigate={setCurrentScreen} />;
     }
   };

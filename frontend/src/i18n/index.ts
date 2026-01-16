@@ -53,7 +53,7 @@ const languageMap: Record<string, string> = {
 // Custom language detector that maps variants
 const customNavigatorDetector = {
   name: 'customNavigator',
-  lookup() {
+  lookup(): string | undefined {
     const browserLangs = navigator.languages || [navigator.language];
     for (const lang of browserLangs) {
       // Check direct mapping first
@@ -72,7 +72,7 @@ const customNavigatorDetector = {
         return baseLang;
       }
     }
-    return null;
+    return undefined;
   },
 };
 

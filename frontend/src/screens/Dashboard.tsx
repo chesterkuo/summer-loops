@@ -18,7 +18,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [showAllOpportunities, setShowAllOpportunities] = useState(false);
   const [noteText, setNoteText] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
 
   const { user, isAuthenticated, isLoading: authLoading, demoLogin, initialize } = useAuthStore();
   const { contacts, graphData, fetchContacts, fetchGraph, parseText, createContact, isLoading, setSelectedContact } = useContactStore();
@@ -57,12 +56,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     }
     setShowNoteModal(false);
     setNoteText('');
-  };
-
-  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && searchQuery.trim()) {
-      fetchContacts(searchQuery);
-    }
   };
 
   // Get avatar URL for a contact
@@ -220,19 +213,17 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       <div className="flex-1 overflow-y-auto no-scrollbar pb-20">
         {/* Search Bar */}
         <div className="px-6 py-4">
-          <div className="relative flex items-center h-14 w-full rounded-2xl bg-surface-card shadow-lg transition-all group focus-within:ring-2 focus-within:ring-primary/20">
+          <div
+            onClick={() => onNavigate('search')}
+            className="relative flex items-center h-14 w-full rounded-2xl bg-surface-card shadow-lg transition-all cursor-pointer hover:bg-gray-800 group"
+          >
             <div className="absolute left-4 flex items-center justify-center text-primary">
               <span className="material-symbols-outlined icon-filled">search</span>
             </div>
-            <input
-              className="h-full w-full rounded-2xl border-none bg-transparent pl-12 pr-12 text-base font-medium text-white placeholder:text-text-muted/60 focus:ring-0 outline-none"
-              placeholder={t('dashboard.searchPlaceholder')}
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={handleSearch}
-            />
-            <div className="absolute right-4 flex items-center justify-center text-text-muted cursor-pointer" onClick={() => onNavigate('voice')}>
+            <span className="h-full w-full rounded-2xl border-none bg-transparent pl-12 pr-12 text-base font-medium text-text-muted/60 flex items-center">
+              {t('dashboard.searchPlaceholder')}
+            </span>
+            <div className="absolute right-4 flex items-center justify-center text-text-muted" onClick={(e) => { e.stopPropagation(); onNavigate('voice'); }}>
               <span className="material-symbols-outlined">mic</span>
             </div>
           </div>
@@ -315,7 +306,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             contacts.slice(0, 4).map((contact, index) => (
               <div
                 key={contact.id}
-                onClick={() => onNavigate('path')}
+                onClick={() => { setSelectedContact(contact); onNavigate('profile'); }}
                 className="group relative flex flex-col gap-4 rounded-2xl bg-surface-card p-5 transition-all hover:bg-gray-800 cursor-pointer"
               >
                 <div className="flex items-start justify-between">

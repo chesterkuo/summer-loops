@@ -7,18 +7,10 @@ import { useContactStore } from '../stores/contactStore';
 import { useLocaleStore } from '../stores/localeStore';
 import { useNotificationStore } from '../stores/notificationStore';
 import { useAuthStore } from '../stores/authStore';
-import { relationshipsApi, Relationship } from '../services/api';
+import { relationshipsApi, interactionsApi, aiApi, Relationship, Interaction } from '../services/api';
 
 interface ProfileProps {
   onNavigate: (screen: ScreenName) => void;
-}
-
-interface Interaction {
-  id: number;
-  title: string;
-  date: string;
-  note: string;
-  type: string;
 }
 
 const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
@@ -26,49 +18,122 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
   const { currentLocale, setLocale, supportedLanguages } = useLocaleStore();
   const { selectedContact, isLoading, setSelectedContact } = useContactStore();
   const { openCreateModal } = useNotificationStore();
-  const { user, logout } = useAuthStore();
+  const { user, logout, updateUser } = useAuthStore();
   const [userRelationship, setUserRelationship] = useState<Relationship | null>(null);
   const [interactions, setInteractions] = useState<Interaction[]>([]);
+  const [isLoadingInteractions, setIsLoadingInteractions] = useState(false);
+  const [isSavingInteraction, setIsSavingInteraction] = useState(false);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editingName, setEditingName] = useState('');
+  const [isSavingName, setIsSavingName] = useState(false);
+  const [isInsightExpanded, setIsInsightExpanded] = useState(false);
+  const [isEditingBio, setIsEditingBio] = useState(false);
+  const [editingBio, setEditingBio] = useState('');
+  const [isSavingBio, setIsSavingBio] = useState(false);
 
-  // Fetch relationship data for this contact
+  // Fetch relationship and interactions data for this contact
   useEffect(() => {
     if (selectedContact?.id) {
+      // Reset AI summary when contact changes
+      setAiSummary(selectedContact.ai_summary || null);
+
+      // Fetch relationship
       relationshipsApi.list(selectedContact.id).then((result) => {
         if (result.data) {
           const directRel = result.data.find((r: any) => r.is_user_relationship === 1);
           setUserRelationship(directRel || null);
         }
       });
+
+      // Fetch interactions
+      setIsLoadingInteractions(true);
+      interactionsApi.list({ contactId: selectedContact.id, limit: 20 }).then((result) => {
+        if (result.data) {
+          setInteractions(result.data);
+        }
+        setIsLoadingInteractions(false);
+      });
+    } else {
+      setInteractions([]);
+      setUserRelationship(null);
+      setAiSummary(null);
     }
   }, [selectedContact?.id]);
 
+  // Generate AI summary for the contact
+  const generateAiSummary = async () => {
+    if (!selectedContact?.id) return;
+
+    setIsGeneratingSummary(true);
+    const result = await aiApi.generateSummary(selectedContact.id);
+
+    if (result.data?.summary) {
+      setAiSummary(result.data.summary);
+      // Update the contact in the store with the new summary
+      if (result.data.contact) {
+        setSelectedContact(result.data.contact);
+      }
+    }
+    setIsGeneratingSummary(false);
+  };
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
-  const [newInteraction, setNewInteraction] = useState({ title: t('interaction.coffee'), note: '', type: 'coffee' });
+  const [newInteraction, setNewInteraction] = useState({ title: t('interaction.meeting'), note: '', type: 'meeting' });
   const [showMenu, setShowMenu] = useState(false);
 
-  const handleAddInteraction = () => {
-    if (!newInteraction.title) return;
+  const handleAddInteraction = async () => {
+    if (!newInteraction.type || !selectedContact?.id) return;
 
-    const newItem: Interaction = {
-      id: Date.now(),
-      title: newInteraction.title,
-      date: t('interaction.today'),
-      note: newInteraction.note,
-      type: newInteraction.type
-    };
+    setIsSavingInteraction(true);
+    const result = await interactionsApi.create({
+      contactId: selectedContact.id,
+      type: newInteraction.type as 'meeting' | 'call' | 'message' | 'email' | 'other',
+      notes: newInteraction.note || undefined,
+      occurredAt: new Date().toISOString(),
+    });
 
-    setInteractions([newItem, ...interactions]);
+    if (result.data) {
+      setInteractions([result.data, ...interactions]);
+    }
+    setIsSavingInteraction(false);
     setShowAddModal(false);
-    setNewInteraction({ title: t('interaction.coffee'), note: '', type: 'coffee' });
+    setNewInteraction({ title: t('interaction.meeting'), note: '', type: 'meeting' });
   };
 
   const interactionTypes = [
-    { key: 'coffee', label: t('interaction.coffee') },
+    { key: 'meeting', label: t('interaction.meeting') },
     { key: 'call', label: t('interaction.call') },
     { key: 'email', label: t('interaction.email') },
-    { key: 'meeting', label: t('interaction.meeting') },
+    { key: 'message', label: t('interaction.message') },
+    { key: 'other', label: t('interaction.other') },
   ];
+
+  // Helper to format interaction date
+  const formatInteractionDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return t('interaction.today');
+    if (diffDays === 1) return t('interaction.yesterday');
+    if (diffDays < 7) return t('interaction.daysAgo', { days: diffDays });
+    return date.toLocaleDateString();
+  };
+
+  // Helper to get interaction title/icon
+  const getInteractionIcon = (type: string) => {
+    switch (type) {
+      case 'meeting': return 'groups';
+      case 'call': return 'call';
+      case 'email': return 'email';
+      case 'message': return 'chat';
+      default: return 'event';
+    }
+  };
 
   return (
     <div className="flex flex-col h-full bg-background-dark font-display text-white overflow-hidden relative">
@@ -208,15 +273,24 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowAddModal(false)}
-                className="flex-1 py-3 rounded-xl bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold transition-colors"
+                disabled={isSavingInteraction}
+                className="flex-1 py-3 rounded-xl bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold transition-colors disabled:opacity-50"
               >
                 {t('common.cancel')}
               </button>
               <button
                 onClick={handleAddInteraction}
-                className="flex-1 py-3 rounded-xl bg-primary hover:bg-primary-dark text-black text-sm font-bold transition-colors shadow-lg shadow-primary/20"
+                disabled={isSavingInteraction}
+                className="flex-1 py-3 rounded-xl bg-primary hover:bg-primary-dark text-black text-sm font-bold transition-colors shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {t('common.save')}
+                {isSavingInteraction ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black"></div>
+                    {t('common.loading')}
+                  </>
+                ) : (
+                  t('common.save')
+                )}
               </button>
             </div>
           </div>
@@ -246,6 +320,10 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
                  <button onClick={() => { onNavigate('path'); setShowMenu(false); }} className="flex flex-col items-center justify-center p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-colors gap-1 group border border-white/5 hover:border-white/10">
                     <span className="material-symbols-outlined text-accent group-hover:scale-110 transition-transform">insights</span>
                     <span className="text-[10px] font-medium text-gray-300">{t('menu.path')}</span>
+                 </button>
+                 <button onClick={() => { onNavigate('teams'); setShowMenu(false); }} className="flex flex-col items-center justify-center p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-colors gap-1 group border border-white/5 hover:border-white/10">
+                    <span className="material-symbols-outlined text-yellow-400 group-hover:scale-110 transition-transform">groups</span>
+                    <span className="text-[10px] font-medium text-gray-300">{t('teams.title')}</span>
                  </button>
                </div>
              </div>
@@ -310,9 +388,157 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
                 </div>
               </div>
               <div className="flex flex-col items-center text-center gap-1">
-                <h1 className="text-white text-2xl font-extrabold tracking-tight">{user?.name || t('profile.myProfile')}</h1>
+                {isEditingName ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      placeholder={t('profile.namePlaceholder')}
+                      className="bg-surface-card border border-gray-600 rounded-lg px-3 py-2 text-white text-center text-lg font-bold focus:border-primary outline-none w-48"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && editingName.trim()) {
+                          setIsSavingName(true);
+                          updateUser({ name: editingName.trim() }).then(() => {
+                            setIsSavingName(false);
+                            setIsEditingName(false);
+                          });
+                        } else if (e.key === 'Escape') {
+                          setIsEditingName(false);
+                          setEditingName(user?.name || '');
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        if (editingName.trim()) {
+                          setIsSavingName(true);
+                          updateUser({ name: editingName.trim() }).then(() => {
+                            setIsSavingName(false);
+                            setIsEditingName(false);
+                          });
+                        }
+                      }}
+                      disabled={isSavingName || !editingName.trim()}
+                      className="p-2 rounded-lg bg-primary text-black hover:bg-primary-dark disabled:opacity-50"
+                    >
+                      {isSavingName ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black"></div>
+                      ) : (
+                        <span className="material-symbols-outlined text-[18px]">check</span>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsEditingName(false);
+                        setEditingName(user?.name || '');
+                      }}
+                      className="p-2 rounded-lg bg-gray-700 text-white hover:bg-gray-600"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">close</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-white text-2xl font-extrabold tracking-tight">{user?.name || t('profile.myProfile')}</h1>
+                    <button
+                      onClick={() => {
+                        setEditingName(user?.name || '');
+                        setIsEditingName(true);
+                      }}
+                      className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                      title={t('profile.editName')}
+                    >
+                      <span className="material-symbols-outlined text-[18px]">edit</span>
+                    </button>
+                  </div>
+                )}
                 <p className="text-text-muted text-sm font-medium">{user?.email || ''}</p>
               </div>
+            </div>
+
+            {/* Bio / Purpose Section */}
+            <div className="bg-surface-card p-5 rounded-2xl shadow-sm border border-white/5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-xs text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary text-[16px]">target</span>
+                  {t('profile.myGoal')}
+                </h3>
+                {!isEditingBio && (
+                  <button
+                    onClick={() => {
+                      setEditingBio(user?.bio || '');
+                      setIsEditingBio(true);
+                    }}
+                    className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">edit</span>
+                  </button>
+                )}
+              </div>
+              {isEditingBio ? (
+                <div className="space-y-3">
+                  <textarea
+                    value={editingBio}
+                    onChange={(e) => setEditingBio(e.target.value)}
+                    placeholder={t('profile.bioPlaceholder')}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm placeholder:text-gray-500 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/30 resize-none"
+                    rows={4}
+                    maxLength={500}
+                    autoFocus
+                  />
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">{editingBio.length}/500</span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setIsEditingBio(false);
+                          setEditingBio(user?.bio || '');
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-gray-700 text-white text-sm hover:bg-gray-600"
+                      >
+                        {t('common.cancel')}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsSavingBio(true);
+                          updateUser({ bio: editingBio.trim() }).then(() => {
+                            setIsSavingBio(false);
+                            setIsEditingBio(false);
+                          });
+                        }}
+                        disabled={isSavingBio}
+                        className="px-3 py-1.5 rounded-lg bg-primary text-black text-sm font-medium hover:bg-primary-dark disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        {isSavingBio ? (
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-black"></div>
+                        ) : (
+                          <span className="material-symbols-outlined text-[16px]">check</span>
+                        )}
+                        {t('common.save')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : user?.bio ? (
+                <p className="text-gray-300 text-sm leading-relaxed">{user.bio}</p>
+              ) : (
+                <button
+                  onClick={() => {
+                    setEditingBio('');
+                    setIsEditingBio(true);
+                  }}
+                  className="w-full py-4 border border-dashed border-white/20 rounded-xl text-gray-400 text-sm hover:border-primary/50 hover:text-primary transition-colors flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-[18px]">add</span>
+                  {t('profile.addBio')}
+                </button>
+              )}
+              <p className="text-xs text-gray-500 mt-3 flex items-start gap-1.5">
+                <span className="material-symbols-outlined text-[14px] mt-0.5">info</span>
+                {t('profile.bioHint')}
+              </p>
             </div>
 
             {/* Language Settings */}
@@ -405,15 +631,82 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
               </div>
             )}
             {selectedContact.email && (
-              <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
-                <span className="material-symbols-outlined text-[14px]">mail</span>
-                <span>{selectedContact.email}</span>
-              </div>
+              <button
+                className="flex items-center gap-2 mt-3 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 cursor-pointer transition-colors group active:scale-[0.98]"
+                onClick={() => {
+                  navigator.clipboard.writeText(selectedContact.email!);
+                }}
+              >
+                <span className="material-symbols-outlined text-[18px] text-gray-400">mail</span>
+                <span className="text-sm text-gray-200 flex-1 text-left">{selectedContact.email}</span>
+                <span className="material-symbols-outlined text-[16px] text-gray-500 group-hover:text-primary transition-colors">content_copy</span>
+              </button>
             )}
             {selectedContact.phone && (
-              <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
-                <span className="material-symbols-outlined text-[14px]">phone</span>
-                <span>{selectedContact.phone}</span>
+              <div className="flex flex-col gap-2 mt-2">
+                {selectedContact.phone.split(',').map((phone, idx) => (
+                  <button
+                    key={idx}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 cursor-pointer transition-colors group active:scale-[0.98]"
+                    onClick={() => {
+                      navigator.clipboard.writeText(phone.trim());
+                    }}
+                  >
+                    <span className="material-symbols-outlined text-[18px] text-gray-400">phone</span>
+                    <span className="text-sm text-gray-200 flex-1 text-left">{phone.trim()}</span>
+                    <span className="material-symbols-outlined text-[16px] text-gray-500 group-hover:text-primary transition-colors">content_copy</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Social Media Links */}
+            {(selectedContact.line_id || selectedContact.telegram_username || selectedContact.whatsapp_number ||
+              selectedContact.wechat_id || selectedContact.twitter_handle || selectedContact.instagram_handle ||
+              selectedContact.linkedin_url) && (
+              <div className="flex flex-wrap gap-2 mt-4">
+                {selectedContact.line_id && (
+                  <a href={`https://line.me/R/ti/p/${selectedContact.line_id}`} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#00B900]/20 border border-[#00B900]/30 text-[#00B900] text-xs font-medium hover:bg-[#00B900]/30 transition-colors">
+                    <span className="text-sm">LINE</span>
+                  </a>
+                )}
+                {selectedContact.telegram_username && (
+                  <a href={`https://t.me/${selectedContact.telegram_username}`} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#0088cc]/20 border border-[#0088cc]/30 text-[#0088cc] text-xs font-medium hover:bg-[#0088cc]/30 transition-colors">
+                    <span className="text-sm">Telegram</span>
+                  </a>
+                )}
+                {selectedContact.whatsapp_number && (
+                  <a href={`https://wa.me/${selectedContact.whatsapp_number.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#25D366]/20 border border-[#25D366]/30 text-[#25D366] text-xs font-medium hover:bg-[#25D366]/30 transition-colors">
+                    <span className="text-sm">WhatsApp</span>
+                  </a>
+                )}
+                {selectedContact.wechat_id && (
+                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#07C160]/20 border border-[#07C160]/30 text-[#07C160] text-xs font-medium cursor-pointer hover:bg-[#07C160]/30 transition-colors"
+                    onClick={() => navigator.clipboard.writeText(selectedContact.wechat_id!)}>
+                    <span className="text-sm">WeChat: {selectedContact.wechat_id}</span>
+                  </div>
+                )}
+                {selectedContact.twitter_handle && (
+                  <a href={`https://twitter.com/${selectedContact.twitter_handle}`} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#1DA1F2]/20 border border-[#1DA1F2]/30 text-[#1DA1F2] text-xs font-medium hover:bg-[#1DA1F2]/30 transition-colors">
+                    <span className="text-sm">X/Twitter</span>
+                  </a>
+                )}
+                {selectedContact.instagram_handle && (
+                  <a href={`https://instagram.com/${selectedContact.instagram_handle}`} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#E4405F]/20 border border-[#E4405F]/30 text-[#E4405F] text-xs font-medium hover:bg-[#E4405F]/30 transition-colors">
+                    <span className="text-sm">Instagram</span>
+                  </a>
+                )}
+                {selectedContact.linkedin_url && (
+                  <a href={selectedContact.linkedin_url} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#0A66C2]/20 border border-[#0A66C2]/30 text-[#0A66C2] text-xs font-medium hover:bg-[#0A66C2]/30 transition-colors">
+                    <span className="text-sm">LinkedIn</span>
+                  </a>
+                )}
               </div>
             )}
           </div>
@@ -457,18 +750,57 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
         </div>
 
         {/* Insight Card */}
-        <div className="bg-surface-card p-6 rounded-2xl shadow-sm border border-white/5 relative overflow-hidden group min-h-[180px] flex flex-col justify-between">
+        <div className="bg-surface-card p-6 rounded-2xl shadow-sm border border-white/5 relative group flex flex-col">
           <div className="absolute -right-6 -top-6 w-24 h-24 bg-primary/10 rounded-full blur-2xl group-hover:bg-primary/20 transition-colors"></div>
           <div className="relative z-10">
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
                 <div className="flex items-center justify-center size-8 rounded-lg bg-primary/10 text-primary">
-                <span className="material-symbols-outlined icon-filled text-[18px]">auto_awesome</span>
+                  <span className="material-symbols-outlined icon-filled text-[18px]">auto_awesome</span>
                 </div>
                 <h3 className="font-bold text-white text-base">{t('profile.warmlyInsight')}</h3>
+              </div>
+              <button
+                onClick={generateAiSummary}
+                disabled={isGeneratingSummary}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-colors disabled:opacity-50"
+              >
+                {isGeneratingSummary ? (
+                  <>
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></div>
+                    <span>{t('profile.generating')}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[14px]">{aiSummary ? 'refresh' : 'auto_awesome'}</span>
+                    <span>{aiSummary ? t('profile.regenerate') : t('profile.generate')}</span>
+                  </>
+                )}
+              </button>
             </div>
-            <p className="text-gray-300 text-[15px] leading-relaxed">
-                {selectedContact.ai_summary || selectedContact.notes || t('profile.defaultInsight', { name: selectedContact.name })}
-            </p>
+            {isGeneratingSummary ? (
+              <div className="flex items-center gap-2 py-4">
+                <div className="animate-pulse flex-1 space-y-2">
+                  <div className="h-3 bg-white/10 rounded w-full"></div>
+                  <div className="h-3 bg-white/10 rounded w-4/5"></div>
+                  <div className="h-3 bg-white/10 rounded w-3/5"></div>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <p className={`text-gray-300 text-[15px] leading-relaxed ${!isInsightExpanded ? 'line-clamp-4' : ''}`}>
+                  {aiSummary || selectedContact.notes || t('profile.defaultInsight', { name: selectedContact.name })}
+                </p>
+                {(aiSummary || selectedContact.notes || '').length > 200 && (
+                  <button
+                    onClick={() => setIsInsightExpanded(!isInsightExpanded)}
+                    className="text-primary text-sm font-medium mt-2 hover:underline"
+                  >
+                    {isInsightExpanded ? t('common.close') : t('profile.viewAnalysis')}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
           <div className="mt-4 flex items-center justify-between pt-4 border-t border-white/5 relative z-10">
             <div className="flex items-center gap-1.5 text-xs text-gray-500">
@@ -501,7 +833,11 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
               <div className="absolute left-[9px] top-2 bottom-2 w-[2px] bg-white/5"></div>
             )}
 
-            {interactions.length === 0 ? (
+            {isLoadingInteractions ? (
+              <div className="flex items-center justify-center py-6">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+              </div>
+            ) : interactions.length === 0 ? (
               <div className="text-center py-6 text-gray-500">
                 <span className="material-symbols-outlined text-3xl mb-2 block">history</span>
                 <p className="text-sm">{t('profile.noInteractions')}</p>
@@ -511,18 +847,20 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
               interactions.map((interaction) => (
                 <div key={interaction.id} className="relative flex gap-4 items-start group animate-fade-in">
                   <div
-                    className={`relative z-10 flex size-4 shrink-0 items-center justify-center rounded-full border-[2px] mt-1 shadow-sm
-                      ${interaction.type === 'coffee' || interaction.type === 'call'
+                    className={`relative z-10 flex size-6 shrink-0 items-center justify-center rounded-full border-[2px] shadow-sm
+                      ${interaction.type === 'meeting' || interaction.type === 'call'
                         ? 'bg-background-dark border-primary shadow-primary/20'
                         : 'bg-surface-card border-gray-600'}`}
-                  ></div>
+                  >
+                    <span className="material-symbols-outlined text-[12px] text-gray-400">{getInteractionIcon(interaction.type)}</span>
+                  </div>
                   <div className="flex-1 flex flex-col gap-1">
                     <div className="flex justify-between items-baseline">
-                      <span className="font-bold text-white text-sm">{interaction.title}</span>
-                      <span className="text-xs text-gray-400">{interaction.date}</span>
+                      <span className="font-bold text-white text-sm capitalize">{t(`interaction.${interaction.type}`)}</span>
+                      <span className="text-xs text-gray-400">{formatInteractionDate(interaction.occurred_at)}</span>
                     </div>
-                    {interaction.note && (
-                      <p className="text-xs text-gray-400 line-clamp-1">{interaction.note}</p>
+                    {interaction.notes && (
+                      <p className="text-xs text-gray-400 line-clamp-2">{interaction.notes}</p>
                     )}
                   </div>
                 </div>

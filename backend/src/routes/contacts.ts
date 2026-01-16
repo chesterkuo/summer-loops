@@ -96,8 +96,10 @@ contacts.post('/', async (c) => {
   const now = new Date().toISOString()
 
   db.query(`
-    INSERT INTO contacts (id, user_id, name, company, title, email, phone, linkedin_url, notes, source, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO contacts (id, user_id, name, company, title, email, phone, linkedin_url, notes, source,
+      line_id, telegram_username, whatsapp_number, wechat_id, twitter_handle, facebook_url, instagram_handle,
+      created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     userId,
@@ -109,6 +111,26 @@ contacts.post('/', async (c) => {
     body.linkedinUrl || null,
     body.notes || null,
     body.source || 'manual',
+    body.lineId || null,
+    body.telegramUsername || null,
+    body.whatsappNumber || null,
+    body.wechatId || null,
+    body.twitterHandle || null,
+    body.facebookUrl || null,
+    body.instagramHandle || null,
+    now,
+    now
+  )
+
+  // Automatically create a direct (1st degree) relationship between user and contact
+  const relationshipId = generateId()
+  db.query(`
+    INSERT INTO relationships (id, user_id, contact_a_id, contact_b_id, is_user_relationship, relationship_type, strength, verified, created_at, updated_at)
+    VALUES (?, ?, ?, NULL, 1, 'direct', 5, 1, ?, ?)
+  `).run(
+    relationshipId,
+    userId,
+    id,
     now,
     now
   )
@@ -168,6 +190,35 @@ contacts.put('/:id', async (c) => {
   if (body.aiSummary !== undefined) {
     updates.push('ai_summary = ?')
     params.push(body.aiSummary || null)
+  }
+  // Social media fields
+  if (body.lineId !== undefined) {
+    updates.push('line_id = ?')
+    params.push(body.lineId || null)
+  }
+  if (body.telegramUsername !== undefined) {
+    updates.push('telegram_username = ?')
+    params.push(body.telegramUsername || null)
+  }
+  if (body.whatsappNumber !== undefined) {
+    updates.push('whatsapp_number = ?')
+    params.push(body.whatsappNumber || null)
+  }
+  if (body.wechatId !== undefined) {
+    updates.push('wechat_id = ?')
+    params.push(body.wechatId || null)
+  }
+  if (body.twitterHandle !== undefined) {
+    updates.push('twitter_handle = ?')
+    params.push(body.twitterHandle || null)
+  }
+  if (body.facebookUrl !== undefined) {
+    updates.push('facebook_url = ?')
+    params.push(body.facebookUrl || null)
+  }
+  if (body.instagramHandle !== undefined) {
+    updates.push('instagram_handle = ?')
+    params.push(body.instagramHandle || null)
   }
 
   if (updates.length === 0) {

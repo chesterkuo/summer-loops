@@ -11,24 +11,37 @@ interface PathDiscoveryProps {
 
 const PathDiscovery: React.FC<PathDiscoveryProps> = ({ onNavigate }) => {
   const { t } = useTranslation();
-  const { contacts, fetchContacts, setSelectedContact } = useContactStore();
+  const { contacts, fetchContacts, setSelectedContact, selectedContact, setIntroPath } = useContactStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [paths, setPaths] = useState<PathResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [initializedFromContact, setInitializedFromContact] = useState(false);
 
   useEffect(() => {
     fetchContacts();
   }, []);
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
+  // If navigated from Network page with a selected contact, pre-populate search
+  useEffect(() => {
+    if (selectedContact && !initializedFromContact) {
+      setSearchQuery(selectedContact.name);
+      setInitializedFromContact(true);
+      // Auto-trigger search after setting the query
+      setTimeout(() => {
+        handleSearchWithQuery(selectedContact.name);
+      }, 100);
+    }
+  }, [selectedContact, initializedFromContact]);
+
+  const handleSearchWithQuery = async (query: string) => {
+    if (!query.trim()) return;
 
     setIsSearching(true);
     setHasSearched(true);
 
     const result = await pathsApi.search({
-      targetDescription: searchQuery,
+      targetDescription: query,
       maxHops: 4,
     });
 
@@ -38,6 +51,10 @@ const PathDiscovery: React.FC<PathDiscoveryProps> = ({ onNavigate }) => {
       setPaths([]);
     }
     setIsSearching(false);
+  };
+
+  const handleSearch = async () => {
+    await handleSearchWithQuery(searchQuery);
   };
 
   // Get the best path (first one)
@@ -107,6 +124,82 @@ const PathDiscovery: React.FC<PathDiscoveryProps> = ({ onNavigate }) => {
                 {t('pathDiscovery.noPathDescription')}
               </p>
             </div>
+          ) : bestPath.hops === 1 ? (
+            /* Direct Connection - Already Connected */
+            <>
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              {/* Success Icon */}
+              <div className="relative mb-6">
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border-2 border-primary/30">
+                  <span className="material-symbols-outlined text-[48px] text-primary icon-filled">check_circle</span>
+                </div>
+                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-primary text-black px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+                  {t('pathDiscovery.directConnection')}
+                </div>
+              </div>
+
+              {/* Target Contact */}
+              {(() => {
+                const target = bestPath.path[bestPath.path.length - 1];
+                const targetContact = contacts.find(c => c.id === target.contactId);
+                return (
+                  <div className="mb-6">
+                    <div
+                      className="w-20 h-20 rounded-full bg-surface-card p-1 border-2 border-primary mx-auto mb-3 flex items-center justify-center bg-gradient-to-br from-gray-700 to-gray-800 cursor-pointer hover:scale-105 transition-transform"
+                      onClick={() => {
+                        if (targetContact) {
+                          setSelectedContact(targetContact);
+                          onNavigate('profile');
+                        }
+                      }}
+                    >
+                      <span className="font-bold text-white text-2xl">
+                        {target.name?.charAt(0)?.toUpperCase() || '?'}
+                      </span>
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-1">{target.name}</h3>
+                    <p className="text-gray-400 text-sm">{target.title || target.company || ''}</p>
+                  </div>
+                );
+              })()}
+
+              {/* Already Connected Badge */}
+              <div className="bg-primary/10 border border-primary/30 rounded-2xl px-6 py-4 max-w-sm">
+                <div className="flex items-center gap-2 justify-center mb-2">
+                  <span className="material-symbols-outlined text-primary">handshake</span>
+                  <span className="text-primary font-bold">{t('pathDiscovery.alreadyConnected')}</span>
+                </div>
+                <p className="text-gray-300 text-sm">
+                  {t('pathDiscovery.directConnectionDesc', { name: bestPath.path[bestPath.path.length - 1]?.name?.split(' ')[0] || 'This contact' })}
+                </p>
+              </div>
+            </div>
+
+            {/* Action Buttons for Direct Connection */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  const target = bestPath.path[bestPath.path.length - 1];
+                  const targetContact = contacts.find(c => c.id === target.contactId);
+                  if (targetContact) {
+                    setSelectedContact(targetContact);
+                    onNavigate('profile');
+                  }
+                }}
+                className="flex-1 bg-surface-card hover:bg-surface-card/80 text-white font-bold py-4 rounded-xl border border-white/10 flex items-center justify-center gap-2 transition-all"
+              >
+                <span className="material-symbols-outlined">person</span>
+                {t('networkMap.viewProfile')}
+              </button>
+              <button
+                onClick={() => onNavigate('draft')}
+                className="flex-1 bg-primary hover:bg-primary-dark text-black font-bold py-4 rounded-xl shadow-[0_0_20px_rgba(57,224,121,0.3)] flex items-center justify-center gap-2 transition-all"
+              >
+                <span className="material-symbols-outlined icon-filled">mail</span>
+                {t('pathDiscovery.messageDirectly')}
+              </button>
+            </div>
+            </>
           ) : (
           <>
           <div className="flex items-center justify-between px-1 mt-2">
@@ -176,10 +269,10 @@ const PathDiscovery: React.FC<PathDiscoveryProps> = ({ onNavigate }) => {
 
                     {/* Connector line */}
                     {!isLast && (
-                      <div className={`flex-1 min-w-[40px] h-[2px] ${edge?.strength >= 5 ? 'bg-gradient-to-r from-primary/30 via-primary to-primary/30' : 'bg-gray-700'} relative mx-1 self-center mb-8`}>
+                      <div className={`flex-1 min-w-[40px] h-[2px] ${edge?.strength >= 4 ? 'bg-gradient-to-r from-primary/30 via-primary to-primary/30' : 'bg-gray-700'} relative mx-1 self-center mb-8`}>
                         <div className="absolute -top-8 left-1/2 -translate-x-1/2 flex flex-col items-center animate-fade-in-up">
-                          <div className={`${edge?.strength >= 7 ? 'bg-green-500/10 text-green-400 border-green-500/30' : edge?.strength >= 4 ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'} text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap shadow-sm mb-1 border`}>
-                            {Math.round((edge?.strength || 5) * 10)}% Match
+                          <div className={`${bestPath.estimatedSuccessRate >= 60 ? 'bg-green-500/10 text-green-400 border-green-500/30' : bestPath.estimatedSuccessRate >= 40 ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'} text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap shadow-sm mb-1 border`}>
+                            {Math.round(bestPath.estimatedSuccessRate)}% Match
                           </div>
                           <span className="material-symbols-outlined text-primary text-[14px]">arrow_forward</span>
                         </div>
@@ -271,8 +364,8 @@ const PathDiscovery: React.FC<PathDiscoveryProps> = ({ onNavigate }) => {
       </div>
 
       {/* Action Bar */}
-      {bestPath && (
-        <div className="p-6 bg-[#181d20] border-t border-gray-800 z-10 shrink-0 mb-safe-bottom">
+      {bestPath && bestPath.hops > 1 && (
+        <div className="p-6 bg-[#181d20] border-t border-gray-800 z-10 shrink-0 mb-20">
           <div className="flex justify-between items-center mb-3 px-1">
             <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{t('pathDiscovery.successProbability')}</span>
             <span className={`text-sm font-bold ${bestPath.estimatedSuccessRate >= 60 ? 'text-primary' : bestPath.estimatedSuccessRate >= 40 ? 'text-yellow-400' : 'text-red-400'}`}>
@@ -286,7 +379,17 @@ const PathDiscovery: React.FC<PathDiscoveryProps> = ({ onNavigate }) => {
             ></div>
           </div>
           <button
-            onClick={() => onNavigate('draft')}
+            onClick={() => {
+              // Set the intro path from the discovered path
+              if (bestPath?.path) {
+                setIntroPath(bestPath.path.map(p => ({
+                  contactId: p.contactId,
+                  name: p.name,
+                  company: p.company
+                })));
+              }
+              onNavigate('draft');
+            }}
             className="w-full bg-primary hover:bg-primary-dark text-black font-bold py-4 rounded-xl shadow-[0_0_20px_rgba(57,224,121,0.3)] flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
           >
             <span className="material-symbols-outlined icon-filled">edit_note</span>

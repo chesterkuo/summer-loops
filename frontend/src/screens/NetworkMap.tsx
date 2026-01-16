@@ -67,6 +67,10 @@ const NetworkMap: React.FC<NetworkMapProps> = ({ onNavigate }) => {
     showDormant: false
   });
 
+  // Search State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
+
   // Fetch graph data on mount
   useEffect(() => {
     fetchGraph();
@@ -83,15 +87,57 @@ const NetworkMap: React.FC<NetworkMapProps> = ({ onNavigate }) => {
   const selectedNode = graphData?.nodes.find(n => n.id === selectedNodeId);
   const selectedContact = contacts.find(c => c.id === selectedNodeId);
 
+  // Filter nodes based on search query
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim() || !graphData?.nodes) return [];
+    const query = searchQuery.toLowerCase();
+    return graphData.nodes.filter(n =>
+      n.id !== 'user' && (
+        n.name?.toLowerCase().includes(query) ||
+        n.company?.toLowerCase().includes(query) ||
+        n.title?.toLowerCase().includes(query)
+      )
+    );
+  }, [searchQuery, graphData]);
+
+  // Handle search input change - only filter, don't zoom
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+
+    // Clear selection when search changes, but don't auto-zoom
+    if (!value.trim()) {
+      setHighlightedNodeId(null);
+    }
+  };
+
+  // Handle selecting a search result
+  const handleSelectSearchResult = (nodeId: string) => {
+    setSelectedNodeId(nodeId);
+    setHighlightedNodeId(nodeId);
+    setSearchQuery('');
+
+    // Pan to the node
+    const pos = nodePositions[nodeId];
+    if (pos) {
+      setTransform(prev => ({
+        ...prev,
+        x: -pos.x * prev.scale,
+        y: -pos.y * prev.scale
+      }));
+    }
+  };
+
   // --- Gesture Handlers ---
 
   const handlePointerDown = (e: React.PointerEvent) => {
-    // Only drag if not touching a button or interactive element
-    if ((e.target as HTMLElement).closest('button')) return;
-    
+    // Only drag if not touching a button, node, or interactive element
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('[data-node]')) return;
+
     setIsDragging(true);
     lastPos.current = { x: e.clientX, y: e.clientY };
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    target.setPointerCapture(e.pointerId);
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
@@ -177,7 +223,7 @@ const NetworkMap: React.FC<NetworkMapProps> = ({ onNavigate }) => {
     <div className="relative w-full h-full flex flex-col bg-[#101323] overflow-hidden text-white font-display">
       
       {/* --- Header --- */}
-      <header className="absolute top-0 left-0 right-0 z-40 px-4 pt-4 pb-2 flex justify-between items-start pointer-events-none">
+      <header className="absolute top-0 left-0 right-0 z-40 px-4 pt-4 pb-2 flex justify-between items-start pointer-events-none safe-area-top safe-area-inset-x">
         <button onClick={() => onNavigate('dashboard')} className="pointer-events-auto flex items-center justify-center size-10 rounded-full bg-black/40 backdrop-blur-md text-white hover:bg-white/10 transition-colors border border-white/10">
           <span className="material-symbols-outlined text-[20px]">arrow_back</span>
         </button>
@@ -349,19 +395,30 @@ const NetworkMap: React.FC<NetworkMapProps> = ({ onNavigate }) => {
                       const ringColor = ringColors[pos.ring % ringColors.length];
                       const nodeSize = pos.ring === 1 ? 'size-14' : pos.ring === 2 ? 'size-12' : 'size-10';
                       const isSelected = selectedNodeId === node.id;
+                      const isHighlighted = highlightedNodeId === node.id;
+                      const isSearchMatch = searchQuery && searchResults.some(r => r.id === node.id);
 
                       return (
                         <div
                           key={node.id}
-                          className={`absolute z-10 flex flex-col items-center cursor-pointer group transition-all ${isSelected ? 'z-30' : ''}`}
+                          data-node={node.id}
+                          className={`absolute z-10 flex flex-col items-center cursor-pointer group transition-all ${isSelected || isHighlighted ? 'z-30' : ''} ${searchQuery && !isSearchMatch ? 'opacity-30' : ''}`}
                           style={{
                             transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px))`,
                           }}
-                          onClick={() => setSelectedNodeId(isSelected ? null : node.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Always select the node when clicked (don't toggle off)
+                            setSelectedNodeId(node.id);
+                            setHighlightedNodeId(node.id);
+                          }}
                         >
                           <div
-                            className={`relative ${nodeSize} rounded-full p-0.5 bg-[#101323] ring-2 group-hover:scale-110 transition-transform ${isSelected ? 'scale-125 ring-4' : ''}`}
-                            style={{ boxShadow: `0 0 15px ${ringColor}40`, borderColor: ringColor }}
+                            className={`relative ${nodeSize} rounded-full p-0.5 bg-[#101323] ring-2 group-hover:scale-110 transition-transform ${isSelected || isHighlighted ? 'scale-125 ring-4' : ''}`}
+                            style={{
+                              boxShadow: isHighlighted ? `0 0 25px ${ringColor}` : `0 0 15px ${ringColor}40`,
+                              borderColor: ringColor
+                            }}
                           >
                             <div
                               className="w-full h-full rounded-full flex items-center justify-center bg-gradient-to-br from-gray-700 to-gray-800"
@@ -391,51 +448,196 @@ const NetworkMap: React.FC<NetworkMapProps> = ({ onNavigate }) => {
         </div>
       </div>
 
+      {/* --- Zoom Controls (Fixed) --- */}
+      <div className="absolute bottom-32 left-4 z-40 flex flex-col gap-2 pointer-events-auto safe-area-inset-left">
+        <button
+          onClick={() => setTransform(prev => ({ ...prev, scale: Math.min(4, prev.scale + 0.3) }))}
+          className="w-10 h-10 bg-[#1b1d28]/90 backdrop-blur-md border border-white/10 rounded-xl flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all shadow-lg"
+        >
+          <span className="material-symbols-outlined text-[20px]">add</span>
+        </button>
+        <button
+          onClick={() => setTransform(prev => ({ ...prev, scale: Math.max(0.5, prev.scale - 0.3) }))}
+          className="w-10 h-10 bg-[#1b1d28]/90 backdrop-blur-md border border-white/10 rounded-xl flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all shadow-lg"
+        >
+          <span className="material-symbols-outlined text-[20px]">remove</span>
+        </button>
+      </div>
+
       {/* --- Floating HUD (Fixed) --- */}
-      <div className="absolute top-[80px] left-0 right-0 z-30 p-4 w-full flex flex-col gap-3 pointer-events-none">
-        <div className="pointer-events-auto bg-[#1b1d28]/80 backdrop-blur-md border border-white/10 rounded-lg p-3 flex items-center gap-2 shadow-lg w-full max-w-sm mx-auto transition-transform hover:scale-[1.02]">
-          <span className="material-symbols-outlined text-gray-400">search</span>
-          <input className="bg-transparent border-none text-white text-sm w-full focus:ring-0 outline-none" placeholder={t('networkMap.highlightPath')} />
+      <div className="absolute top-[72px] sm:top-[80px] left-0 right-0 z-40 px-4 sm:px-4 w-full flex flex-col gap-3 pointer-events-none safe-area-inset-x">
+        <div className="pointer-events-auto w-full max-w-sm mx-auto relative">
+          <div className="bg-[#1b1d28]/90 backdrop-blur-md border border-white/10 rounded-xl p-2.5 sm:p-3 flex items-center gap-2 shadow-lg">
+            <span className="material-symbols-outlined text-gray-400 text-[20px]">search</span>
+            <input
+              className="bg-transparent border-none text-white text-sm w-full focus:ring-0 outline-none placeholder:text-gray-500"
+              placeholder={t('networkMap.highlightPath')}
+              value={searchQuery}
+              onChange={handleSearchChange}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => { setSearchQuery(''); setHighlightedNodeId(null); }}
+                className="text-gray-400 hover:text-white p-1"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            )}
+          </div>
+
+          {/* Search Results Dropdown */}
+          {searchQuery && searchResults.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-[#1b1d28]/95 backdrop-blur-md border border-white/10 rounded-xl shadow-xl max-h-[50vh] overflow-y-auto overscroll-contain">
+              {searchResults.map(node => (
+                <button
+                  key={node.id}
+                  onClick={() => handleSelectSearchResult(node.id)}
+                  className={`w-full px-3 sm:px-4 py-3 flex items-center gap-3 hover:bg-white/10 active:bg-white/15 transition-colors text-left border-b border-white/5 last:border-0 ${
+                    highlightedNodeId === node.id ? 'bg-primary/20' : ''
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-bold text-sm">
+                      {node.name?.charAt(0)?.toUpperCase() || '?'}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-sm font-medium truncate">{node.name}</p>
+                    <p className="text-gray-400 text-xs truncate">
+                      {node.title}{node.title && node.company ? ' at ' : ''}{node.company || t('networkMap.noCompanyInfo')}
+                    </p>
+                  </div>
+                  <span className="material-symbols-outlined text-gray-500 text-[18px]">arrow_forward</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* No results message */}
+          {searchQuery && searchResults.length === 0 && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-[#1b1d28]/95 backdrop-blur-md border border-white/10 rounded-xl shadow-xl p-4 text-center">
+              <p className="text-gray-400 text-sm">{t('search.noResults')}</p>
+            </div>
+          )}
         </div>
       </div>
 
       {/* --- Bottom Sheet Detail (Fixed) --- */}
       {(selectedNode || !graphData) && (
-        <div className="absolute bottom-0 left-0 right-0 z-30 w-full bg-[#1b1d28]/95 backdrop-blur-xl border-t border-white/10 rounded-t-xl p-5 pb-8 shadow-2xl transition-transform animate-slide-up">
-          <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-4"></div>
+        <div className="absolute bottom-0 left-0 right-0 z-30 w-full bg-[#1b1d28]/95 backdrop-blur-xl border-t border-white/10 rounded-t-xl p-5 pb-8 shadow-2xl transition-transform animate-slide-up safe-area-inset-bottom">
+          {/* Drag handle / close button */}
+          <div className="flex items-center justify-center mb-4 relative">
+            <div
+              className="w-10 h-1 bg-white/20 rounded-full cursor-pointer"
+              onClick={() => {
+                setSelectedNodeId(null);
+                setHighlightedNodeId(null);
+              }}
+            ></div>
+            {selectedNode && (
+              <button
+                onClick={() => {
+                  setSelectedNodeId(null);
+                  setHighlightedNodeId(null);
+                }}
+                className="absolute right-0 top-1/2 -translate-y-1/2 p-1.5 rounded-full hover:bg-white/10 text-gray-400"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            )}
+          </div>
           {selectedNode ? (
             <div className="flex gap-4">
-              <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-primary/30 to-accent/30 border border-white/10 shadow-lg flex items-center justify-center">
-                <span className="text-2xl font-bold text-white">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg bg-gradient-to-br from-primary/30 to-accent/30 border border-white/10 shadow-lg flex items-center justify-center flex-shrink-0">
+                <span className="text-xl sm:text-2xl font-bold text-white">
                   {selectedNode.name?.charAt(0)?.toUpperCase() || '?'}
                 </span>
               </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <h2 className="text-white text-xl font-bold">{selectedNode.name}</h2>
-                  <span className="bg-primary/20 text-primary border border-primary/20 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">
-                    {selectedNode.degree} Connection{selectedNode.degree > 1 ? 's' : ''}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <h2 className="text-white text-lg sm:text-xl font-bold truncate">{selectedNode.name}</h2>
+                  <span className="bg-primary/20 text-primary border border-primary/20 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase whitespace-nowrap">
+                    {selectedNode.degree} {selectedNode.degree > 1 ? 'Connections' : 'Connection'}
                   </span>
                 </div>
-                <p className="text-gray-400 text-sm">
+                <p className="text-gray-400 text-sm truncate">
                   {selectedNode.title || ''}{selectedNode.title && selectedNode.company ? ' at ' : ''}{selectedNode.company || t('networkMap.noCompanyInfo')}
                 </p>
-                <div className="mt-3 flex gap-3">
+                <div className="mt-3 flex gap-2 sm:gap-3">
                   <button
                     onClick={() => {
+                      // Use selectedContact if available, otherwise create minimal contact from node
                       if (selectedContact) {
                         setSelectedContact(selectedContact);
-                        onNavigate('profile');
+                      } else {
+                        // Create a minimal contact object from node data for navigation
+                        setSelectedContact({
+                          id: selectedNode.id,
+                          user_id: '',
+                          name: selectedNode.name || '',
+                          company: selectedNode.company || null,
+                          department: null,
+                          title: selectedNode.title || null,
+                          email: null,
+                          phone: null,
+                          linkedin_url: null,
+                          notes: null,
+                          ai_summary: null,
+                          source: null,
+                          created_at: '',
+                          updated_at: '',
+                          line_id: null,
+                          telegram_username: null,
+                          whatsapp_number: null,
+                          wechat_id: null,
+                          twitter_handle: null,
+                          facebook_url: null,
+                          instagram_handle: null,
+                        });
                       }
+                      onNavigate('profile');
                     }}
-                    className="flex-1 bg-white/10 hover:bg-white/20 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm"
+                    className="flex-1 bg-white/10 hover:bg-white/20 text-white font-bold py-2.5 px-3 sm:px-4 rounded-lg flex items-center justify-center gap-1.5 sm:gap-2 transition-colors text-xs sm:text-sm active:scale-95"
                   >
-                    <span className="material-symbols-outlined text-[18px]">person</span>
-                    {t('networkMap.viewProfile')}
+                    <span className="material-symbols-outlined text-[16px] sm:text-[18px]">person</span>
+                    <span className="truncate">{t('networkMap.viewProfile')}</span>
                   </button>
-                  <button onClick={() => onNavigate('path')} className="flex-1 bg-primary hover:bg-primary-dark text-black font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm">
-                    <span className="material-symbols-outlined text-[18px]">handshake</span>
-                    {t('networkMap.findPath')}
+                  <button
+                    onClick={() => {
+                      // Use selectedContact if available, otherwise create minimal contact from node
+                      if (selectedContact) {
+                        setSelectedContact(selectedContact);
+                      } else {
+                        setSelectedContact({
+                          id: selectedNode.id,
+                          user_id: '',
+                          name: selectedNode.name || '',
+                          company: selectedNode.company || null,
+                          department: null,
+                          title: selectedNode.title || null,
+                          email: null,
+                          phone: null,
+                          linkedin_url: null,
+                          notes: null,
+                          ai_summary: null,
+                          source: null,
+                          created_at: '',
+                          updated_at: '',
+                          line_id: null,
+                          telegram_username: null,
+                          whatsapp_number: null,
+                          wechat_id: null,
+                          twitter_handle: null,
+                          facebook_url: null,
+                          instagram_handle: null,
+                        });
+                      }
+                      onNavigate('path');
+                    }}
+                    className="flex-1 bg-primary hover:bg-primary-dark text-black font-bold py-2.5 px-3 sm:px-4 rounded-lg flex items-center justify-center gap-1.5 sm:gap-2 transition-colors text-xs sm:text-sm active:scale-95"
+                  >
+                    <span className="material-symbols-outlined text-[16px] sm:text-[18px]">handshake</span>
+                    <span className="truncate">{t('networkMap.findPath')}</span>
                   </button>
                 </div>
               </div>

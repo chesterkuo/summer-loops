@@ -137,7 +137,7 @@ auth.get('/me', authMiddleware, (c) => {
   const db = getDb()
 
   const dbUser = db.query(
-    'SELECT id, email, name, avatar_url, created_at FROM users WHERE id = ?'
+    'SELECT id, email, name, avatar_url, bio, created_at FROM users WHERE id = ?'
   ).get(user.userId) as Omit<User, 'google_id' | 'updated_at'> | null
 
   if (!dbUser) {
@@ -150,6 +150,70 @@ auth.get('/me', authMiddleware, (c) => {
       email: dbUser.email,
       name: dbUser.name,
       avatarUrl: (dbUser as any).avatar_url,
+      bio: (dbUser as any).bio,
+      createdAt: (dbUser as any).created_at
+    }
+  })
+})
+
+// Update current user info
+auth.put('/me', authMiddleware, async (c) => {
+  const user = c.get('user')
+  const db = getDb()
+  const body = await c.req.json() as { name?: string; avatarUrl?: string; bio?: string }
+
+  // Validate input
+  if (!body.name && !body.avatarUrl && body.bio === undefined) {
+    return c.json({ error: 'No fields to update' }, 400)
+  }
+
+  const now = new Date().toISOString()
+  const updates: string[] = []
+  const values: any[] = []
+
+  if (body.name) {
+    if (body.name.trim().length < 1 || body.name.length > 100) {
+      return c.json({ error: 'Name must be between 1 and 100 characters' }, 400)
+    }
+    updates.push('name = ?')
+    values.push(body.name.trim())
+  }
+
+  if (body.avatarUrl) {
+    updates.push('avatar_url = ?')
+    values.push(body.avatarUrl)
+  }
+
+  if (body.bio !== undefined) {
+    if (body.bio && body.bio.length > 500) {
+      return c.json({ error: 'Bio must be less than 500 characters' }, 400)
+    }
+    updates.push('bio = ?')
+    values.push(body.bio || null)
+  }
+
+  updates.push('updated_at = ?')
+  values.push(now)
+  values.push(user.userId)
+
+  db.query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...values)
+
+  // Fetch updated user
+  const dbUser = db.query(
+    'SELECT id, email, name, avatar_url, bio, created_at FROM users WHERE id = ?'
+  ).get(user.userId) as Omit<User, 'google_id' | 'updated_at'> | null
+
+  if (!dbUser) {
+    return c.json({ error: 'User not found' }, 404)
+  }
+
+  return c.json({
+    data: {
+      id: dbUser.id,
+      email: dbUser.email,
+      name: dbUser.name,
+      avatarUrl: (dbUser as any).avatar_url,
+      bio: (dbUser as any).bio,
       createdAt: (dbUser as any).created_at
     }
   })

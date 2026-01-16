@@ -45,12 +45,12 @@ const BottomNav: React.FC<BottomNavProps> = ({ active, onNavigate }) => {
            </div>
         </button>
 
-        <button 
+        <button
           onClick={() => onNavigate('path')}
           className={`flex flex-col items-center gap-1 ${active === 'insights' ? 'text-primary' : 'text-gray-500 hover:text-gray-300'}`}
         >
-          <span className={`material-symbols-outlined text-[24px] ${active === 'insights' ? 'icon-filled' : ''}`}>insights</span>
-          <span className="text-[10px] font-medium">{t('nav.insights')}</span>
+          <span className={`material-symbols-outlined text-[24px] ${active === 'insights' ? 'icon-filled' : ''}`}>person_search</span>
+          <span className="text-[10px] font-medium">{t('nav.finder')}</span>
         </button>
 
         <button

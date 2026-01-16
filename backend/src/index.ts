@@ -12,6 +12,7 @@ import tags from './routes/tags.js'
 import search from './routes/search.js'
 import ai from './routes/ai.js'
 import notifications from './routes/notifications.js'
+import teams from './routes/teams.js'
 
 const app = new Hono()
 
@@ -46,6 +47,7 @@ app.route('/api/tags', tags)
 app.route('/api/search', search)
 app.route('/api/ai', ai)
 app.route('/api/notifications', notifications)
+app.route('/api/teams', teams)
 
 // Seed demo data for testing
 function seedDemoData() {

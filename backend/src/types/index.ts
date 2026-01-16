@@ -9,6 +9,14 @@ export interface CreateContactRequest {
   linkedinUrl?: string
   notes?: string
   source?: 'manual' | 'card_scan' | 'linkedin' | 'natural_language' | 'calendar'
+  // Social media
+  lineId?: string
+  telegramUsername?: string
+  whatsappNumber?: string
+  wechatId?: string
+  twitterHandle?: string
+  facebookUrl?: string
+  instagramHandle?: string
 }
 
 export interface UpdateContactRequest {
@@ -20,6 +28,14 @@ export interface UpdateContactRequest {
   linkedinUrl?: string
   notes?: string
   aiSummary?: string
+  // Social media
+  lineId?: string
+  telegramUsername?: string
+  whatsappNumber?: string
+  wechatId?: string
+  twitterHandle?: string
+  facebookUrl?: string
+  instagramHandle?: string
 }
 
 export interface CreateRelationshipRequest {
@@ -61,6 +77,14 @@ export interface Contact {
   sourceMetadata: string | null
   createdAt: string
   updatedAt: string
+  // Social media
+  lineId: string | null
+  telegramUsername: string | null
+  whatsappNumber: string | null
+  wechatId: string | null
+  twitterHandle: string | null
+  facebookUrl: string | null
+  instagramHandle: string | null
 }
 
 export interface Relationship {
@@ -87,8 +111,14 @@ export interface User {
   name: string
   avatarUrl: string | null
   googleId: string
+  bio: string | null
   createdAt: string
   updatedAt: string
+}
+
+export interface UpdateUserRequest {
+  name?: string
+  bio?: string
 }
 
 // Career History

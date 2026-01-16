@@ -1,11 +1,19 @@
 import { create } from 'zustand'
 import { contactsApi, relationshipsApi, Contact, Relationship, GraphData } from '../services/api'
 
+// Path node for introduction requests
+interface IntroPathNode {
+  contactId: string
+  name: string
+  company: string | null
+}
+
 interface ContactState {
   contacts: Contact[]
   selectedContact: Contact | null
   relationships: Relationship[]
   graphData: GraphData | null
+  introPath: IntroPathNode[] | null  // Path from user to target for introduction
   isLoading: boolean
   error: string | null
 
@@ -29,6 +37,7 @@ interface ContactState {
   }) => Promise<boolean>
   clearError: () => void
   setSelectedContact: (contact: Contact | null) => void
+  setIntroPath: (path: IntroPathNode[] | null) => void
 }
 
 export const useContactStore = create<ContactState>((set, get) => ({
@@ -36,6 +45,7 @@ export const useContactStore = create<ContactState>((set, get) => ({
   selectedContact: null,
   relationships: [],
   graphData: null,
+  introPath: null,
   isLoading: false,
   error: null,
 
@@ -177,4 +187,5 @@ export const useContactStore = create<ContactState>((set, get) => ({
 
   clearError: () => set({ error: null }),
   setSelectedContact: (contact) => set({ selectedContact: contact }),
+  setIntroPath: (path) => set({ introPath: path }),
 }))
