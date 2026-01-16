@@ -1,5 +1,5 @@
 {
-  "id": "com.warmly.app",
+  "id": "com.mywarmly.app",
   "appName": "Warmly",
   "platformVersion": "7.4.4",
   "title": "Warmly - Personal CRM",
@@ -22,6 +22,10 @@
     "scheme": "App",
     "buildNumber": "1"
   },
+
+  "iosUpload": true,
+  "appStoreConnectAccount": "chester.kuo1978@gmail.com",
+  "appStoreConnectAppPassword": "tccf-lycb-aaas-macp",
 
   "webDir": "dist",
   "orientation": "portrait",

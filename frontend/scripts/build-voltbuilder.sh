@@ -83,23 +83,45 @@ echo "[6/6] Creating VoltBuilder package..."
 PACKAGE_NAME="warmly-voltbuilder-$(date +%Y%m%d-%H%M%S).zip"
 PACKAGE_PATH="$PROJECT_DIR/$PACKAGE_NAME"
 
+# Create VoltBuilder-specific package.json (no TypeScript build)
+cat > package.voltbuilder.json << 'PKGJSON'
+{
+  "name": "warmly-mobile",
+  "version": "1.0.0",
+  "description": "Warmly - Personal CRM",
+  "scripts": {
+    "build": "echo 'Build handled by Vite'"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.4",
+    "@capacitor/core": "^7.4.4",
+    "@capacitor/ios": "^7.4.4",
+    "@capacitor/splash-screen": "^7.0.3",
+    "@capacitor/status-bar": "^7.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.4.4"
+  }
+}
+PKGJSON
+
 # Create certificates directory and copy certificates
 mkdir -p certificates
-if [ -f "$PROJECT_DIR/ios_distribution.p12" ]; then
-    cp "$PROJECT_DIR/ios_distribution.p12" certificates/
+if [ -f "$PROJECT_DIR/certificates/ios_distribution.p12" ]; then
+    cp "$PROJECT_DIR/certificates/ios_distribution.p12" certificates/
     echo "  Including iOS distribution certificate."
 fi
-if [ -f "$PROJECT_DIR/MyWarmly_App_profile.mobileprovision" ]; then
-    cp "$PROJECT_DIR/MyWarmly_App_profile.mobileprovision" certificates/
+if [ -f "$PROJECT_DIR/certificates/MyWarmly_App_profile.mobileprovision" ]; then
+    cp "$PROJECT_DIR/certificates/MyWarmly_App_profile.mobileprovision" certificates/
     echo "  Including provisioning profile."
 fi
 
 # Create the zip with required structure (matching reference project)
+# Use VoltBuilder-specific package.json
 zip -r "$PACKAGE_PATH" \
     voltbuilder.json \
     capacitor.config.json \
     config.xml \
-    package.json \
     dist/ \
     ios/ \
     certificates/ \
@@ -108,8 +130,13 @@ zip -r "$PACKAGE_PATH" \
     -x "ios/App/Pods/*" \
     -x "*.xcworkspace/xcuserdata/*"
 
+# Add the VoltBuilder package.json (renamed from package.voltbuilder.json)
+zip -j "$PACKAGE_PATH" package.voltbuilder.json
+# Rename inside zip
+printf "@ package.voltbuilder.json\n@=package.json\n" | zipnote -w "$PACKAGE_PATH"
+
 # Clean up
-rm -rf certificates
+rm -rf certificates package.voltbuilder.json
 
 echo ""
 echo "=== Build Complete ==="

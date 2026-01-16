@@ -1,5 +1,5 @@
 {
-  "appId": "com.warmly.app",
+  "appId": "com.mywarmly.app",
   "appName": "Warmly",
   "webDir": "dist",
   "ios": {
