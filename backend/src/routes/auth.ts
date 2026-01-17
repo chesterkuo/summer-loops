@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { getDb, generateId } from '../db/index.js'
-import { generateToken, getExpirationMs, verifyToken } from '../utils/jwt.js'
+import { sql, generateId } from '../db/postgres.js'
+import { generateToken, getExpirationMs } from '../utils/jwt.js'
 import { authMiddleware } from '../middleware/auth.js'
 import type { User } from '../types/index.js'
 
@@ -60,10 +60,8 @@ auth.post('/signup', async (c) => {
     return c.json({ error: 'Name must be between 1 and 100 characters' }, 400)
   }
 
-  const db = getDb()
-
   // Check if email already exists
-  const existingUser = db.query('SELECT id FROM users WHERE email = ?').get(body.email.toLowerCase())
+  const [existingUser] = await sql`SELECT id FROM users WHERE email = ${body.email.toLowerCase()}`
   if (existingUser) {
     return c.json({ error: 'Email already registered' }, 409)
   }
@@ -79,12 +77,12 @@ auth.post('/signup', async (c) => {
     const now = new Date().toISOString()
     const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(body.name)}&background=39E079&color=fff`
 
-    db.query(`
+    await sql`
       INSERT INTO users (id, email, name, avatar_url, password_hash, auth_provider, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, 'email', ?, ?)
-    `).run(userId, body.email.toLowerCase(), body.name.trim(), avatarUrl, passwordHash, now, now)
+      VALUES (${userId}, ${body.email.toLowerCase()}, ${body.name.trim()}, ${avatarUrl}, ${passwordHash}, 'email', ${now}, ${now})
+    `
 
-    const user = db.query('SELECT * FROM users WHERE id = ?').get(userId) as User
+    const [user] = await sql<User[]>`SELECT * FROM users WHERE id = ${userId}`
 
     // Generate JWT token
     const token = await generateToken({
@@ -119,10 +117,8 @@ auth.post('/login', async (c) => {
     return c.json({ error: 'Email and password are required' }, 400)
   }
 
-  const db = getDb()
-
   // Find user by email
-  const user = db.query('SELECT * FROM users WHERE email = ?').get(body.email.toLowerCase()) as User | null
+  const [user] = await sql<User[]>`SELECT * FROM users WHERE email = ${body.email.toLowerCase()}`
 
   if (!user) {
     return c.json({ error: 'Invalid email or password' }, 401)
@@ -242,29 +238,26 @@ auth.get('/google/callback', async (c) => {
     }
 
     // Find or create user in database
-    const db = getDb()
-    let user = db.query(
-      'SELECT * FROM users WHERE google_id = ?'
-    ).get(googleUser.id) as User | null
+    let [user] = await sql<User[]>`SELECT * FROM users WHERE google_id = ${googleUser.id}`
 
     const now = new Date().toISOString()
 
     if (!user) {
       // Create new user
       const userId = generateId()
-      db.query(`
+      await sql`
         INSERT INTO users (id, email, name, avatar_url, google_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(userId, googleUser.email, googleUser.name, googleUser.picture, googleUser.id, now, now)
+        VALUES (${userId}, ${googleUser.email}, ${googleUser.name}, ${googleUser.picture}, ${googleUser.id}, ${now}, ${now})
+      `
 
-      user = db.query('SELECT * FROM users WHERE id = ?').get(userId) as User
+      ;[user] = await sql<User[]>`SELECT * FROM users WHERE id = ${userId}`
     } else {
       // Update existing user
-      db.query(`
-        UPDATE users SET name = ?, avatar_url = ?, updated_at = ? WHERE id = ?
-      `).run(googleUser.name, googleUser.picture, now, user.id)
+      await sql`
+        UPDATE users SET name = ${googleUser.name}, avatar_url = ${googleUser.picture}, updated_at = ${now} WHERE id = ${user.id}
+      `
 
-      user = db.query('SELECT * FROM users WHERE id = ?').get(user.id) as User
+      ;[user] = await sql<User[]>`SELECT * FROM users WHERE id = ${user.id}`
     }
 
     // Generate JWT token
@@ -275,8 +268,6 @@ auth.get('/google/callback', async (c) => {
     })
 
     // Set cookie and redirect to frontend
-    const maxAge = Math.floor(getExpirationMs() / 1000)
-
     return c.redirect(`${FRONTEND_URL}/auth/callback?token=${token}`, 302)
   } catch (error) {
     console.error('OAuth callback error:', error)
@@ -285,13 +276,12 @@ auth.get('/google/callback', async (c) => {
 })
 
 // Get current user info
-auth.get('/me', authMiddleware, (c) => {
+auth.get('/me', authMiddleware, async (c) => {
   const user = c.get('user')
-  const db = getDb()
 
-  const dbUser = db.query(
-    'SELECT id, email, name, avatar_url, bio, created_at FROM users WHERE id = ?'
-  ).get(user.userId) as Omit<User, 'google_id' | 'updated_at'> | null
+  const [dbUser] = await sql<User[]>`
+    SELECT id, email, name, avatar_url, bio, created_at FROM users WHERE id = ${user.userId}
+  `
 
   if (!dbUser) {
     return c.json({ error: 'User not found' }, 404)
@@ -312,7 +302,6 @@ auth.get('/me', authMiddleware, (c) => {
 // Update current user info
 auth.put('/me', authMiddleware, async (c) => {
   const user = c.get('user')
-  const db = getDb()
   const body = await c.req.json() as { name?: string; avatarUrl?: string; bio?: string }
 
   // Validate input
@@ -321,40 +310,33 @@ auth.put('/me', authMiddleware, async (c) => {
   }
 
   const now = new Date().toISOString()
-  const updates: string[] = []
-  const values: any[] = []
 
   if (body.name) {
     if (body.name.trim().length < 1 || body.name.length > 100) {
       return c.json({ error: 'Name must be between 1 and 100 characters' }, 400)
     }
-    updates.push('name = ?')
-    values.push(body.name.trim())
   }
 
-  if (body.avatarUrl) {
-    updates.push('avatar_url = ?')
-    values.push(body.avatarUrl)
+  if (body.bio !== undefined && body.bio && body.bio.length > 500) {
+    return c.json({ error: 'Bio must be less than 500 characters' }, 400)
   }
 
-  if (body.bio !== undefined) {
-    if (body.bio && body.bio.length > 500) {
-      return c.json({ error: 'Bio must be less than 500 characters' }, 400)
-    }
-    updates.push('bio = ?')
-    values.push(body.bio || null)
-  }
+  // Build and execute update
+  const [existing] = await sql<User[]>`SELECT * FROM users WHERE id = ${user.userId}`
 
-  updates.push('updated_at = ?')
-  values.push(now)
-  values.push(user.userId)
-
-  db.query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...values)
+  await sql`
+    UPDATE users SET
+      name = ${body.name?.trim() || existing.name},
+      avatar_url = ${body.avatarUrl || (existing as any).avatar_url},
+      bio = ${body.bio !== undefined ? (body.bio || null) : (existing as any).bio},
+      updated_at = ${now}
+    WHERE id = ${user.userId}
+  `
 
   // Fetch updated user
-  const dbUser = db.query(
-    'SELECT id, email, name, avatar_url, bio, created_at FROM users WHERE id = ?'
-  ).get(user.userId) as Omit<User, 'google_id' | 'updated_at'> | null
+  const [dbUser] = await sql<User[]>`
+    SELECT id, email, name, avatar_url, bio, created_at FROM users WHERE id = ${user.userId}
+  `
 
   if (!dbUser) {
     return c.json({ error: 'User not found' }, 404)
@@ -398,7 +380,6 @@ auth.post('/logout', (c) => {
 // Delete account
 auth.delete('/account', authMiddleware, async (c) => {
   const user = c.get('user')
-  const db = getDb()
 
   // Don't allow deleting demo account
   if (user.userId === DEMO_USER_ID) {
@@ -406,18 +387,8 @@ auth.delete('/account', authMiddleware, async (c) => {
   }
 
   try {
-    // Delete in order to respect foreign key constraints
-    // The schema has ON DELETE CASCADE, so deleting user will cascade to:
-    // - contacts (which cascades to career_history, education_history, contact_tags, interactions)
-    // - relationships
-    // - introduction_requests
-    // - tags
-    // - teams (owned)
-    // - team_members
-    // - notifications
-
     // Delete the user (cascades to all related data)
-    db.query('DELETE FROM users WHERE id = ?').run(user.userId)
+    await sql`DELETE FROM users WHERE id = ${user.userId}`
 
     return c.json({
       data: {
@@ -446,10 +417,8 @@ auth.get('/status', (c) => {
 
 // Initialize demo account with sample data
 auth.post('/demo', async (c) => {
-  const db = getDb()
-
   // Get or create demo user
-  let user = db.query('SELECT * FROM users WHERE id = ?').get(DEMO_USER_ID) as User | null
+  let [user] = await sql<User[]>`SELECT * FROM users WHERE id = ${DEMO_USER_ID}`
 
   if (!user) {
     const now = new Date().toISOString()
@@ -458,22 +427,14 @@ auth.post('/demo', async (c) => {
       cost: 12
     })
 
-    db.query(`
+    await sql`
       INSERT INTO users (id, email, name, avatar_url, password_hash, auth_provider, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, 'demo', ?, ?)
-    `).run(
-      DEMO_USER_ID,
-      DEMO_EMAIL,
-      'Chester',
-      'https://ui-avatars.com/api/?name=Chester&background=39E079&color=fff',
-      passwordHash,
-      now,
-      now
-    )
-    user = db.query('SELECT * FROM users WHERE id = ?').get(DEMO_USER_ID) as User
+      VALUES (${DEMO_USER_ID}, ${DEMO_EMAIL}, 'Chester', 'https://ui-avatars.com/api/?name=Chester&background=39E079&color=fff', ${passwordHash}, 'demo', ${now}, ${now})
+    `
+    ;[user] = await sql<User[]>`SELECT * FROM users WHERE id = ${DEMO_USER_ID}`
 
     // Initialize sample data for demo user
-    await initializeDemoData(db, DEMO_USER_ID)
+    await initializeDemoData(DEMO_USER_ID)
   } else {
     // Update password hash if demo user exists but might not have password
     const existingHash = (user as any).password_hash
@@ -482,8 +443,7 @@ auth.post('/demo', async (c) => {
         algorithm: 'bcrypt',
         cost: 12
       })
-      db.query('UPDATE users SET password_hash = ?, auth_provider = ? WHERE id = ?')
-        .run(passwordHash, 'demo', DEMO_USER_ID)
+      await sql`UPDATE users SET password_hash = ${passwordHash}, auth_provider = 'demo' WHERE id = ${DEMO_USER_ID}`
     }
   }
 
@@ -508,7 +468,7 @@ auth.post('/demo', async (c) => {
 })
 
 // Initialize demo data with sample contacts and relationships
-async function initializeDemoData(db: any, userId: string): Promise<void> {
+async function initializeDemoData(userId: string): Promise<void> {
   const now = new Date().toISOString()
 
   // Sample contacts
@@ -523,13 +483,12 @@ async function initializeDemoData(db: any, userId: string): Promise<void> {
   ]
 
   for (const contact of sampleContacts) {
-    const existing = db.query('SELECT id FROM contacts WHERE id = ?').get(contact.id)
+    const [existing] = await sql`SELECT id FROM contacts WHERE id = ${contact.id}`
     if (!existing) {
-      const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}&background=random&color=fff`
-      db.query(`
+      await sql`
         INSERT INTO contacts (id, user_id, name, company, title, email, source, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, 'manual', ?, ?)
-      `).run(contact.id, userId, contact.name, contact.company, contact.title, contact.email, now, now)
+        VALUES (${contact.id}, ${userId}, ${contact.name}, ${contact.company}, ${contact.title}, ${contact.email}, 'manual', ${now}, ${now})
+      `
     }
   }
 
@@ -546,12 +505,12 @@ async function initializeDemoData(db: any, userId: string): Promise<void> {
 
   for (const rel of sampleRelationships) {
     const relId = `rel-demo-${rel.contactId}`
-    const existing = db.query('SELECT id FROM relationships WHERE id = ?').get(relId)
+    const [existing] = await sql`SELECT id FROM relationships WHERE id = ${relId}`
     if (!existing) {
-      db.query(`
+      await sql`
         INSERT INTO relationships (id, user_id, contact_a_id, is_user_relationship, relationship_type, strength, how_met, created_at, updated_at)
-        VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)
-      `).run(relId, userId, rel.contactId, rel.type, rel.strength, rel.howMet, now, now)
+        VALUES (${relId}, ${userId}, ${rel.contactId}, true, ${rel.type}, ${rel.strength}, ${rel.howMet}, ${now}, ${now})
+      `
     }
   }
 
@@ -566,12 +525,12 @@ async function initializeDemoData(db: any, userId: string): Promise<void> {
 
   for (const rel of contactRelationships) {
     const relId = `rel-demo-${rel.from}-${rel.to}`
-    const existing = db.query('SELECT id FROM relationships WHERE id = ?').get(relId)
+    const [existing] = await sql`SELECT id FROM relationships WHERE id = ${relId}`
     if (!existing) {
-      db.query(`
+      await sql`
         INSERT INTO relationships (id, user_id, contact_a_id, contact_b_id, is_user_relationship, relationship_type, strength, created_at, updated_at)
-        VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)
-      `).run(relId, userId, rel.from, rel.to, rel.type, rel.strength, now, now)
+        VALUES (${relId}, ${userId}, ${rel.from}, ${rel.to}, false, ${rel.type}, ${rel.strength}, ${now}, ${now})
+      `
     }
   }
 

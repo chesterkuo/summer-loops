@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { getDb } from '../db/index.js'
+import { sql } from '../db/postgres.js'
 import { authMiddleware } from '../middleware/auth.js'
 import { parseNaturalLanguage, isGeminiAvailable } from '../services/gemini.js'
 import type { Contact } from '../types/index.js'
@@ -17,7 +17,6 @@ interface SearchResult {
 
 // Natural language search
 search.post('/', async (c) => {
-  const db = getDb()
   const userId = c.get('user').userId
   const body = await c.req.json<{ query: string; limit?: number }>()
 
@@ -38,45 +37,49 @@ search.post('/', async (c) => {
     }
   }
 
-  // Build search based on parsed query or raw text
-  const searchTerms: string[] = []
-  const searchParams: any[] = [userId]
+  // Build search terms for dynamic query
+  let contacts: Contact[]
 
-  // Extract search terms from parsed query or use raw query
-  if (parsedQuery?.name) {
-    searchTerms.push('name LIKE ?')
-    searchParams.push(`%${parsedQuery.name}%`)
-  }
-  if (parsedQuery?.company) {
-    searchTerms.push('company LIKE ?')
-    searchParams.push(`%${parsedQuery.company}%`)
-  }
-  if (parsedQuery?.title) {
-    searchTerms.push('title LIKE ?')
-    searchParams.push(`%${parsedQuery.title}%`)
-  }
-  if (parsedQuery?.industry) {
-    searchTerms.push('(company LIKE ? OR title LIKE ? OR notes LIKE ?)')
-    searchParams.push(`%${parsedQuery.industry}%`, `%${parsedQuery.industry}%`, `%${parsedQuery.industry}%`)
-  }
+  if (parsedQuery?.name || parsedQuery?.company || parsedQuery?.title || parsedQuery?.industry) {
+    // Parsed query search - use specific fields
+    const namePattern = parsedQuery?.name ? `%${parsedQuery.name}%` : null
+    const companyPattern = parsedQuery?.company ? `%${parsedQuery.company}%` : null
+    const titlePattern = parsedQuery?.title ? `%${parsedQuery.title}%` : null
+    const industryPattern = parsedQuery?.industry ? `%${parsedQuery.industry}%` : null
 
-  // If no parsed terms, do a broad search
-  if (searchTerms.length === 0) {
-    const words = query.split(/\s+/).filter(w => w.length > 2)
-    for (const word of words) {
-      searchTerms.push('(name LIKE ? OR company LIKE ? OR title LIKE ? OR notes LIKE ? OR email LIKE ?)')
-      searchParams.push(`%${word}%`, `%${word}%`, `%${word}%`, `%${word}%`, `%${word}%`)
-    }
+    contacts = await sql<Contact[]>`
+      SELECT * FROM contacts
+      WHERE user_id = ${userId}
+      AND (
+        (${namePattern}::text IS NOT NULL AND name ILIKE ${namePattern})
+        OR (${companyPattern}::text IS NOT NULL AND company ILIKE ${companyPattern})
+        OR (${titlePattern}::text IS NOT NULL AND title ILIKE ${titlePattern})
+        OR (${industryPattern}::text IS NOT NULL AND (
+          company ILIKE ${industryPattern}
+          OR title ILIKE ${industryPattern}
+          OR notes ILIKE ${industryPattern}
+        ))
+      )
+      ORDER BY updated_at DESC
+      LIMIT ${limit}
+    `
+  } else {
+    // Broad search - search across multiple fields with the raw query
+    const searchPattern = `%${query}%`
+    contacts = await sql<Contact[]>`
+      SELECT * FROM contacts
+      WHERE user_id = ${userId}
+      AND (
+        name ILIKE ${searchPattern}
+        OR company ILIKE ${searchPattern}
+        OR title ILIKE ${searchPattern}
+        OR notes ILIKE ${searchPattern}
+        OR email ILIKE ${searchPattern}
+      )
+      ORDER BY updated_at DESC
+      LIMIT ${limit}
+    `
   }
-
-  // Build the final query
-  let sqlQuery = 'SELECT * FROM contacts WHERE user_id = ?'
-  if (searchTerms.length > 0) {
-    sqlQuery += ' AND (' + searchTerms.join(' OR ') + ')'
-  }
-  sqlQuery += ` ORDER BY updated_at DESC LIMIT ${limit}`
-
-  const contacts = db.query(sqlQuery).all(...searchParams) as Contact[]
 
   // Calculate relevance scores
   const results: SearchResult[] = contacts.map(contact => {
@@ -126,16 +129,15 @@ search.post('/', async (c) => {
 })
 
 // Find similar contacts
-search.get('/similar/:contactId', (c) => {
-  const db = getDb()
+search.get('/similar/:contactId', async (c) => {
   const userId = c.get('user').userId
   const { contactId } = c.req.param()
   const { limit = '10' } = c.req.query()
 
   // Get the reference contact
-  const refContact = db.query(
-    'SELECT * FROM contacts WHERE id = ? AND user_id = ?'
-  ).get(contactId, userId) as Contact | null
+  const [refContact] = await sql<Contact[]>`
+    SELECT * FROM contacts WHERE id = ${contactId} AND user_id = ${userId}
+  `
 
   if (!refContact) {
     return c.json({ error: 'Contact not found' }, 404)
@@ -145,23 +147,23 @@ search.get('/similar/:contactId', (c) => {
   const similarContacts: (Contact & { similarityScore: number; similarityReasons: string[] })[] = []
 
   // Get all other contacts
-  const allContacts = db.query(
-    'SELECT * FROM contacts WHERE user_id = ? AND id != ?'
-  ).all(userId, contactId) as Contact[]
+  const allContacts = await sql<Contact[]>`
+    SELECT * FROM contacts WHERE user_id = ${userId} AND id != ${contactId}
+  `
 
   // Get career history for reference contact
-  const refCareer = db.query(
-    'SELECT company FROM career_history WHERE contact_id = ?'
-  ).all(contactId) as { company: string }[]
+  const refCareer = await sql<{ company: string }[]>`
+    SELECT company FROM career_history WHERE contact_id = ${contactId}
+  `
   const refCompanies = new Set([
     refContact.company?.toLowerCase(),
     ...refCareer.map(c => c.company.toLowerCase())
   ].filter(Boolean))
 
   // Get education history for reference contact
-  const refEducation = db.query(
-    'SELECT school FROM education_history WHERE contact_id = ?'
-  ).all(contactId) as { school: string }[]
+  const refEducation = await sql<{ school: string }[]>`
+    SELECT school FROM education_history WHERE contact_id = ${contactId}
+  `
   const refSchools = new Set(refEducation.map(e => e.school.toLowerCase()))
 
   for (const contact of allContacts) {
@@ -187,9 +189,9 @@ search.get('/similar/:contactId', (c) => {
     }
 
     // Worked at same company (career history)
-    const contactCareer = db.query(
-      'SELECT company FROM career_history WHERE contact_id = ?'
-    ).all(contact.id) as { company: string }[]
+    const contactCareer = await sql<{ company: string }[]>`
+      SELECT company FROM career_history WHERE contact_id = ${contact.id}
+    `
     const contactCompanies = new Set([
       contact.company?.toLowerCase(),
       ...contactCareer.map(c => c.company.toLowerCase())
@@ -204,9 +206,9 @@ search.get('/similar/:contactId', (c) => {
     }
 
     // Same school
-    const contactEducation = db.query(
-      'SELECT school FROM education_history WHERE contact_id = ?'
-    ).all(contact.id) as { school: string }[]
+    const contactEducation = await sql<{ school: string }[]>`
+      SELECT school FROM education_history WHERE contact_id = ${contact.id}
+    `
     for (const edu of contactEducation) {
       if (refSchools.has(edu.school.toLowerCase())) {
         score += 10

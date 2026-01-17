@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { getDb, generateId } from '../db/index.js'
+import { sql, generateId } from '../db/postgres.js'
 import { authMiddleware } from '../middleware/auth.js'
 import { isGeminiAvailable, generateContactSummary, suggestInteraction, inferRelationships } from '../services/gemini.js'
 import type { Contact, Relationship } from '../types/index.js'
@@ -25,13 +25,12 @@ ai.post('/infer', async (c) => {
     return c.json({ error: 'AI features not available - GEMINI_API_KEY not configured' }, 503)
   }
 
-  const db = getDb()
   const userId = c.get('user').userId
 
   // Get all contacts with their career and education history
-  const contacts = db.query(
-    'SELECT * FROM contacts WHERE user_id = ?'
-  ).all(userId) as Contact[]
+  const contacts = await sql<Contact[]>`
+    SELECT * FROM contacts WHERE user_id = ${userId}
+  `
 
   if (contacts.length < 2) {
     return c.json({ error: 'Need at least 2 contacts to infer relationships' }, 400)
@@ -40,25 +39,28 @@ ai.post('/infer', async (c) => {
   // Get career history for all contacts
   const careerData: { [contactId: string]: { company: string; title: string | null; startDate: string | null; endDate: string | null }[] } = {}
   for (const contact of contacts) {
-    const career = db.query(
-      'SELECT company, title, start_date as startDate, end_date as endDate FROM career_history WHERE contact_id = ?'
-    ).all(contact.id) as any[]
+    const career = await sql<any[]>`
+      SELECT company, title, start_date as "startDate", end_date as "endDate"
+      FROM career_history WHERE contact_id = ${contact.id}
+    `
     careerData[contact.id] = career
   }
 
   // Get education history for all contacts
   const educationData: { [contactId: string]: { school: string; degree: string | null; startYear: number | null; endYear: number | null }[] } = {}
   for (const contact of contacts) {
-    const education = db.query(
-      'SELECT school, degree, start_year as startYear, end_year as endYear FROM education_history WHERE contact_id = ?'
-    ).all(contact.id) as any[]
+    const education = await sql<any[]>`
+      SELECT school, degree, start_year as "startYear", end_year as "endYear"
+      FROM education_history WHERE contact_id = ${contact.id}
+    `
     educationData[contact.id] = education
   }
 
   // Get existing relationships to avoid duplicates
-  const existingRels = db.query(
-    'SELECT contact_a_id, contact_b_id FROM relationships WHERE user_id = ? AND contact_b_id IS NOT NULL'
-  ).all(userId) as { contact_a_id: string; contact_b_id: string }[]
+  const existingRels = await sql<{ contact_a_id: string; contact_b_id: string }[]>`
+    SELECT contact_a_id, contact_b_id FROM relationships
+    WHERE user_id = ${userId} AND contact_b_id IS NOT NULL
+  `
 
   const existingPairs = new Set(
     existingRels.map(r => [r.contact_a_id, r.contact_b_id].sort().join('-'))
@@ -81,29 +83,25 @@ ai.post('/infer', async (c) => {
     for (const inf of newInferences) {
       if (inf.confidence >= 0.6) { // Only create if confidence is high enough
         const id = generateId()
-        db.query(`
+        const strength = Math.round(inf.confidence * 5) // Convert confidence to strength 1-5
+
+        await sql`
           INSERT INTO relationships (
             id, user_id, contact_a_id, contact_b_id, is_user_relationship,
             relationship_type, strength, is_ai_inferred, confidence_score,
             verified, created_at, updated_at
           )
-          VALUES (?, ?, ?, ?, 0, ?, ?, 1, ?, 0, ?, ?)
-        `).run(
-          id,
-          userId,
-          inf.contactAId,
-          inf.contactBId,
-          inf.relationshipType,
-          Math.round(inf.confidence * 5), // Convert confidence to strength 1-5
-          inf.confidence,
-          now,
-          now
-        )
+          VALUES (
+            ${id}, ${userId}, ${inf.contactAId}, ${inf.contactBId}, false,
+            ${inf.relationshipType}, ${strength}, true, ${inf.confidence},
+            false, ${now}, ${now}
+          )
+        `
 
         created.push({
           id,
           ...inf,
-          strength: Math.round(inf.confidence * 5)
+          strength
         })
       }
     }
@@ -128,38 +126,38 @@ ai.post('/summary/:contactId', async (c) => {
     return c.json({ error: 'AI features not available - GEMINI_API_KEY not configured' }, 503)
   }
 
-  const db = getDb()
   const userId = c.get('user').userId
   const { contactId } = c.req.param()
 
   // Get contact
-  const contact = db.query(
-    'SELECT * FROM contacts WHERE id = ? AND user_id = ?'
-  ).get(contactId, userId) as Contact | null
+  const [contact] = await sql<Contact[]>`
+    SELECT * FROM contacts WHERE id = ${contactId} AND user_id = ${userId}
+  `
 
   if (!contact) {
     return c.json({ error: 'Contact not found' }, 404)
   }
 
   // Get career history
-  const careerHistory = db.query(
-    'SELECT * FROM career_history WHERE contact_id = ? ORDER BY start_date DESC'
-  ).all(contactId)
+  const careerHistory = await sql`
+    SELECT * FROM career_history WHERE contact_id = ${contactId} ORDER BY start_date DESC
+  `
 
   // Get education history
-  const educationHistory = db.query(
-    'SELECT * FROM education_history WHERE contact_id = ? ORDER BY end_year DESC'
-  ).all(contactId)
+  const educationHistory = await sql`
+    SELECT * FROM education_history WHERE contact_id = ${contactId} ORDER BY end_year DESC
+  `
 
   // Get interactions
-  const interactions = db.query(
-    'SELECT * FROM interactions WHERE contact_id = ? ORDER BY occurred_at DESC LIMIT 10'
-  ).all(contactId)
+  const interactions = await sql`
+    SELECT * FROM interactions WHERE contact_id = ${contactId} ORDER BY occurred_at DESC LIMIT 10
+  `
 
   // Get relationship info
-  const relationship = db.query(
-    'SELECT * FROM relationships WHERE user_id = ? AND is_user_relationship = 1 AND contact_a_id = ?'
-  ).get(userId, contactId)
+  const [relationship] = await sql`
+    SELECT * FROM relationships
+    WHERE user_id = ${userId} AND is_user_relationship = true AND contact_a_id = ${contactId}
+  `
 
   try {
     const summary = await generateContactSummary(
@@ -172,7 +170,7 @@ ai.post('/summary/:contactId', async (c) => {
 
     // Update contact with new summary
     const now = new Date().toISOString()
-    db.query('UPDATE contacts SET ai_summary = ?, updated_at = ? WHERE id = ?').run(summary, now, contactId)
+    await sql`UPDATE contacts SET ai_summary = ${summary}, updated_at = ${now} WHERE id = ${contactId}`
 
     return c.json({
       data: {
@@ -195,28 +193,28 @@ ai.post('/suggest-interaction/:contactId', async (c) => {
     return c.json({ error: 'AI features not available - GEMINI_API_KEY not configured' }, 503)
   }
 
-  const db = getDb()
   const userId = c.get('user').userId
   const { contactId } = c.req.param()
 
   // Get contact
-  const contact = db.query(
-    'SELECT * FROM contacts WHERE id = ? AND user_id = ?'
-  ).get(contactId, userId) as Contact | null
+  const [contact] = await sql<Contact[]>`
+    SELECT * FROM contacts WHERE id = ${contactId} AND user_id = ${userId}
+  `
 
   if (!contact) {
     return c.json({ error: 'Contact not found' }, 404)
   }
 
   // Get recent interactions
-  const recentInteractions = db.query(
-    'SELECT * FROM interactions WHERE contact_id = ? ORDER BY occurred_at DESC LIMIT 5'
-  ).all(contactId)
+  const recentInteractions = await sql`
+    SELECT * FROM interactions WHERE contact_id = ${contactId} ORDER BY occurred_at DESC LIMIT 5
+  `
 
   // Get relationship info
-  const relationship = db.query(
-    'SELECT * FROM relationships WHERE user_id = ? AND is_user_relationship = 1 AND contact_a_id = ?'
-  ).get(userId, contactId)
+  const [relationship] = await sql`
+    SELECT * FROM relationships
+    WHERE user_id = ${userId} AND is_user_relationship = true AND contact_a_id = ${contactId}
+  `
 
   try {
     const suggestion = await suggestInteraction(contact, recentInteractions, relationship)

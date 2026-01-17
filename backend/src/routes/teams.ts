@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { getDb, generateId } from '../db/index.js'
+import { sql, generateId } from '../db/postgres.js'
 import { authMiddleware } from '../middleware/auth.js'
 
 const teams = new Hono()
@@ -28,53 +28,57 @@ interface SharedContact {
 }
 
 // List user's teams
-teams.get('/', (c) => {
-  const db = getDb()
+teams.get('/', async (c) => {
   const userId = c.get('user').userId
 
   // Get teams where user is a member
-  const rows = db.query(`
+  const rows = await sql<(Team & { role: string; member_count: string; contact_count: string })[]>`
     SELECT t.*, tm.role,
            (SELECT COUNT(*) FROM team_members WHERE team_id = t.id) as member_count,
            (SELECT COUNT(*) FROM shared_contacts WHERE team_id = t.id) as contact_count
     FROM teams t
     JOIN team_members tm ON tm.team_id = t.id
-    WHERE tm.user_id = ?
+    WHERE tm.user_id = ${userId}
     ORDER BY t.created_at DESC
-  `).all(userId) as (Team & { role: string; member_count: number; contact_count: number })[]
+  `
 
-  return c.json({ data: rows })
+  return c.json({
+    data: rows.map(r => ({
+      ...r,
+      member_count: Number(r.member_count),
+      contact_count: Number(r.contact_count)
+    }))
+  })
 })
 
 // Get single team
-teams.get('/:id', (c) => {
-  const db = getDb()
+teams.get('/:id', async (c) => {
   const userId = c.get('user').userId
   const { id } = c.req.param()
 
   // Verify user is a member
-  const membership = db.query(
-    'SELECT role FROM team_members WHERE team_id = ? AND user_id = ?'
-  ).get(id, userId) as { role: string } | null
+  const [membership] = await sql<{ role: string }[]>`
+    SELECT role FROM team_members WHERE team_id = ${id} AND user_id = ${userId}
+  `
 
   if (!membership) {
     return c.json({ error: 'Team not found or access denied' }, 404)
   }
 
-  const team = db.query('SELECT * FROM teams WHERE id = ?').get(id) as Team | null
+  const [team] = await sql<Team[]>`SELECT * FROM teams WHERE id = ${id}`
 
   if (!team) {
     return c.json({ error: 'Team not found' }, 404)
   }
 
   // Get members
-  const members = db.query(`
+  const members = await sql`
     SELECT u.id, u.name, u.email, u.avatar_url, tm.role
     FROM team_members tm
     JOIN users u ON u.id = tm.user_id
-    WHERE tm.team_id = ?
+    WHERE tm.team_id = ${id}
     ORDER BY tm.role ASC, u.name ASC
-  `).all(id)
+  `
 
   return c.json({
     data: {
@@ -87,7 +91,6 @@ teams.get('/:id', (c) => {
 
 // Create team
 teams.post('/', async (c) => {
-  const db = getDb()
   const userId = c.get('user').userId
   const body = await c.req.json<{ name: string }>()
 
@@ -99,97 +102,94 @@ teams.post('/', async (c) => {
   const now = new Date().toISOString()
 
   // Create team
-  db.query(`
+  await sql`
     INSERT INTO teams (id, name, owner_id, created_at)
-    VALUES (?, ?, ?, ?)
-  `).run(id, body.name.trim(), userId, now)
+    VALUES (${id}, ${body.name.trim()}, ${userId}, ${now})
+  `
 
   // Add owner as member
-  db.query(`
+  await sql`
     INSERT INTO team_members (team_id, user_id, role)
-    VALUES (?, ?, 'owner')
-  `).run(id, userId)
+    VALUES (${id}, ${userId}, 'owner')
+  `
 
-  const team = db.query('SELECT * FROM teams WHERE id = ?').get(id) as Team
+  const [team] = await sql<Team[]>`SELECT * FROM teams WHERE id = ${id}`
 
   return c.json({ data: team }, 201)
 })
 
 // Update team
 teams.put('/:id', async (c) => {
-  const db = getDb()
   const userId = c.get('user').userId
   const { id } = c.req.param()
   const body = await c.req.json<{ name?: string }>()
 
   // Verify user is owner or admin
-  const membership = db.query(
-    'SELECT role FROM team_members WHERE team_id = ? AND user_id = ?'
-  ).get(id, userId) as { role: string } | null
+  const [membership] = await sql<{ role: string }[]>`
+    SELECT role FROM team_members WHERE team_id = ${id} AND user_id = ${userId}
+  `
 
   if (!membership || !['owner', 'admin'].includes(membership.role)) {
     return c.json({ error: 'Permission denied' }, 403)
   }
 
   if (body.name !== undefined) {
-    db.query('UPDATE teams SET name = ? WHERE id = ?').run(body.name.trim(), id)
+    await sql`UPDATE teams SET name = ${body.name.trim()} WHERE id = ${id}`
   }
 
-  const team = db.query('SELECT * FROM teams WHERE id = ?').get(id) as Team
+  const [team] = await sql<Team[]>`SELECT * FROM teams WHERE id = ${id}`
 
   return c.json({ data: team })
 })
 
 // Delete team
-teams.delete('/:id', (c) => {
-  const db = getDb()
+teams.delete('/:id', async (c) => {
   const userId = c.get('user').userId
   const { id } = c.req.param()
 
   // Verify user is owner
-  const team = db.query(
-    'SELECT * FROM teams WHERE id = ? AND owner_id = ?'
-  ).get(id, userId) as Team | null
+  const [team] = await sql<Team[]>`
+    SELECT * FROM teams WHERE id = ${id} AND owner_id = ${userId}
+  `
 
   if (!team) {
     return c.json({ error: 'Team not found or not the owner' }, 403)
   }
 
   // Delete team (cascades to team_members and shared_contacts)
-  db.query('DELETE FROM teams WHERE id = ?').run(id)
+  await sql`DELETE FROM teams WHERE id = ${id}`
 
   return c.json({ message: 'Team deleted' })
 })
 
 // Add team member
 teams.post('/:id/members', async (c) => {
-  const db = getDb()
   const userId = c.get('user').userId
   const { id } = c.req.param()
   const body = await c.req.json<{ email: string; role?: 'admin' | 'member' }>()
 
   // Verify user is owner or admin
-  const membership = db.query(
-    'SELECT role FROM team_members WHERE team_id = ? AND user_id = ?'
-  ).get(id, userId) as { role: string } | null
+  const [membership] = await sql<{ role: string }[]>`
+    SELECT role FROM team_members WHERE team_id = ${id} AND user_id = ${userId}
+  `
 
   if (!membership || !['owner', 'admin'].includes(membership.role)) {
     return c.json({ error: 'Permission denied' }, 403)
   }
 
   // Find user by email
-  const targetUser = db.query(
-    'SELECT id FROM users WHERE email = ?'
-  ).get(body.email) as { id: string } | null
+  const [targetUser] = await sql<{ id: string }[]>`
+    SELECT id FROM users WHERE email = ${body.email}
+  `
 
   if (!targetUser) {
     return c.json({ error: 'User not found with that email' }, 404)
   }
 
   // Check if already a member
-  const existing = db.query(
-    'SELECT * FROM team_members WHERE team_id = ? AND user_id = ?'
-  ).get(id, targetUser.id)
+  const [existing] = await sql`
+    SELECT * FROM team_members WHERE team_id = ${id} AND user_id = ${targetUser.id}
+  `
 
   if (existing) {
     return c.json({ error: 'User is already a team member' }, 409)
@@ -197,33 +197,32 @@ teams.post('/:id/members', async (c) => {
 
   // Add member
   const role = body.role || 'member'
-  db.query(`
+  await sql`
     INSERT INTO team_members (team_id, user_id, role)
-    VALUES (?, ?, ?)
-  `).run(id, targetUser.id, role)
+    VALUES (${id}, ${targetUser.id}, ${role})
+  `
 
   return c.json({ message: 'Member added', userId: targetUser.id, role }, 201)
 })
 
 // Remove team member
-teams.delete('/:id/members/:memberId', (c) => {
-  const db = getDb()
+teams.delete('/:id/members/:memberId', async (c) => {
   const userId = c.get('user').userId
   const { id, memberId } = c.req.param()
 
   // Verify user is owner or admin
-  const membership = db.query(
-    'SELECT role FROM team_members WHERE team_id = ? AND user_id = ?'
-  ).get(id, userId) as { role: string } | null
+  const [membership] = await sql<{ role: string }[]>`
+    SELECT role FROM team_members WHERE team_id = ${id} AND user_id = ${userId}
+  `
 
   if (!membership || !['owner', 'admin'].includes(membership.role)) {
     return c.json({ error: 'Permission denied' }, 403)
   }
 
   // Can't remove owner
-  const targetMembership = db.query(
-    'SELECT role FROM team_members WHERE team_id = ? AND user_id = ?'
-  ).get(id, memberId) as { role: string } | null
+  const [targetMembership] = await sql<{ role: string }[]>`
+    SELECT role FROM team_members WHERE team_id = ${id} AND user_id = ${memberId}
+  `
 
   if (!targetMembership) {
     return c.json({ error: 'Member not found' }, 404)
@@ -233,101 +232,100 @@ teams.delete('/:id/members/:memberId', (c) => {
     return c.json({ error: 'Cannot remove team owner' }, 403)
   }
 
-  db.query('DELETE FROM team_members WHERE team_id = ? AND user_id = ?').run(id, memberId)
+  await sql`DELETE FROM team_members WHERE team_id = ${id} AND user_id = ${memberId}`
 
   return c.json({ message: 'Member removed' })
 })
 
 // Share contact with team
 teams.post('/:id/share', async (c) => {
-  const db = getDb()
   const userId = c.get('user').userId
   const { id } = c.req.param()
   const body = await c.req.json<{ contactId: string; visibility?: 'basic' | 'full' }>()
 
   // Verify user is team member
-  const membership = db.query(
-    'SELECT role FROM team_members WHERE team_id = ? AND user_id = ?'
-  ).get(id, userId)
+  const [membership] = await sql`
+    SELECT role FROM team_members WHERE team_id = ${id} AND user_id = ${userId}
+  `
 
   if (!membership) {
     return c.json({ error: 'Not a team member' }, 403)
   }
 
   // Verify user owns the contact
-  const contact = db.query(
-    'SELECT * FROM contacts WHERE id = ? AND user_id = ?'
-  ).get(body.contactId, userId)
+  const [contact] = await sql`
+    SELECT * FROM contacts WHERE id = ${body.contactId} AND user_id = ${userId}
+  `
 
   if (!contact) {
     return c.json({ error: 'Contact not found or not yours' }, 404)
   }
 
   // Check if already shared
-  const existing = db.query(
-    'SELECT * FROM shared_contacts WHERE contact_id = ? AND team_id = ?'
-  ).get(body.contactId, id)
+  const [existing] = await sql`
+    SELECT * FROM shared_contacts WHERE contact_id = ${body.contactId} AND team_id = ${id}
+  `
 
   if (existing) {
     // Update visibility
-    db.query('UPDATE shared_contacts SET visibility = ? WHERE contact_id = ? AND team_id = ?')
-      .run(body.visibility || 'basic', body.contactId, id)
+    await sql`
+      UPDATE shared_contacts SET visibility = ${body.visibility || 'basic'}
+      WHERE contact_id = ${body.contactId} AND team_id = ${id}
+    `
     return c.json({ message: 'Contact sharing updated' })
   }
 
   // Share contact
-  db.query(`
+  await sql`
     INSERT INTO shared_contacts (contact_id, team_id, shared_by_id, visibility)
-    VALUES (?, ?, ?, ?)
-  `).run(body.contactId, id, userId, body.visibility || 'basic')
+    VALUES (${body.contactId}, ${id}, ${userId}, ${body.visibility || 'basic'})
+  `
 
   return c.json({ message: 'Contact shared' }, 201)
 })
 
 // Unshare contact
-teams.delete('/:id/share/:contactId', (c) => {
-  const db = getDb()
+teams.delete('/:id/share/:contactId', async (c) => {
   const userId = c.get('user').userId
   const { id, contactId } = c.req.param()
 
   // Verify user shared the contact or is admin/owner
-  const shared = db.query(
-    'SELECT * FROM shared_contacts WHERE contact_id = ? AND team_id = ?'
-  ).get(contactId, id) as SharedContact | null
+  const [shared] = await sql<SharedContact[]>`
+    SELECT * FROM shared_contacts WHERE contact_id = ${contactId} AND team_id = ${id}
+  `
 
   if (!shared) {
     return c.json({ error: 'Shared contact not found' }, 404)
   }
 
-  const membership = db.query(
-    'SELECT role FROM team_members WHERE team_id = ? AND user_id = ?'
-  ).get(id, userId) as { role: string } | null
+  const [membership] = await sql<{ role: string }[]>`
+    SELECT role FROM team_members WHERE team_id = ${id} AND user_id = ${userId}
+  `
 
   if (shared.shared_by_id !== userId && (!membership || !['owner', 'admin'].includes(membership.role))) {
     return c.json({ error: 'Permission denied' }, 403)
   }
 
-  db.query('DELETE FROM shared_contacts WHERE contact_id = ? AND team_id = ?').run(contactId, id)
+  await sql`DELETE FROM shared_contacts WHERE contact_id = ${contactId} AND team_id = ${id}`
 
   return c.json({ message: 'Contact unshared' })
 })
 
 // Get team's shared contacts
-teams.get('/:id/contacts', (c) => {
-  const db = getDb()
+teams.get('/:id/contacts', async (c) => {
   const userId = c.get('user').userId
   const { id } = c.req.param()
 
   // Verify user is team member
-  const membership = db.query(
-    'SELECT role FROM team_members WHERE team_id = ? AND user_id = ?'
-  ).get(id, userId)
+  const [membership] = await sql`
+    SELECT role FROM team_members WHERE team_id = ${id} AND user_id = ${userId}
+  `
 
   if (!membership) {
     return c.json({ error: 'Not a team member' }, 403)
   }
 
-  const contacts = db.query(`
+  const contacts = await sql`
     SELECT
       c.id, c.name, c.company, c.title,
       CASE WHEN sc.visibility = 'full' THEN c.email ELSE NULL END as email,
@@ -338,47 +336,46 @@ teams.get('/:id/contacts', (c) => {
     FROM shared_contacts sc
     JOIN contacts c ON c.id = sc.contact_id
     JOIN users u ON u.id = sc.shared_by_id
-    WHERE sc.team_id = ?
+    WHERE sc.team_id = ${id}
     ORDER BY c.name ASC
-  `).all(id)
+  `
 
   return c.json({ data: contacts })
 })
 
 // Share ALL contacts with team (bulk share)
 teams.post('/:id/share-all', async (c) => {
-  const db = getDb()
   const userId = c.get('user').userId
   const { id } = c.req.param()
   const body = await c.req.json<{ visibility?: 'basic' | 'full' }>()
 
   // Verify user is team member
-  const membership = db.query(
-    'SELECT role FROM team_members WHERE team_id = ? AND user_id = ?'
-  ).get(id, userId)
+  const [membership] = await sql`
+    SELECT role FROM team_members WHERE team_id = ${id} AND user_id = ${userId}
+  `
 
   if (!membership) {
     return c.json({ error: 'Not a team member' }, 403)
   }
 
   // Get all user's contacts that are not already shared
-  const userContacts = db.query(`
+  const userContacts = await sql<{ id: string }[]>`
     SELECT c.id FROM contacts c
-    WHERE c.user_id = ?
+    WHERE c.user_id = ${userId}
     AND c.id NOT IN (
-      SELECT contact_id FROM shared_contacts WHERE team_id = ?
+      SELECT contact_id FROM shared_contacts WHERE team_id = ${id}
     )
-  `).all(userId, id) as { id: string }[]
+  `
 
   const visibility = body.visibility || 'basic'
   let sharedCount = 0
 
   // Share each contact
   for (const contact of userContacts) {
-    db.query(`
+    await sql`
       INSERT INTO shared_contacts (contact_id, team_id, shared_by_id, visibility)
-      VALUES (?, ?, ?, ?)
-    `).run(contact.id, id, userId, visibility)
+      VALUES (${contact.id}, ${id}, ${userId}, ${visibility})
+    `
     sharedCount++
   }
 
@@ -389,14 +386,13 @@ teams.post('/:id/share-all', async (c) => {
 })
 
 // Get user's auto-share setting for a team
-teams.get('/:id/auto-share', (c) => {
-  const db = getDb()
+teams.get('/:id/auto-share', async (c) => {
   const userId = c.get('user').userId
   const { id } = c.req.param()
 
-  const membership = db.query(
-    'SELECT auto_share, auto_share_visibility FROM team_members WHERE team_id = ? AND user_id = ?'
-  ).get(id, userId) as { auto_share: number; auto_share_visibility: string } | null
+  const [membership] = await sql<{ auto_share: boolean; auto_share_visibility: string }[]>`
+    SELECT auto_share, auto_share_visibility FROM team_members WHERE team_id = ${id} AND user_id = ${userId}
+  `
 
   if (!membership) {
     return c.json({ error: 'Not a team member' }, 403)
@@ -404,7 +400,7 @@ teams.get('/:id/auto-share', (c) => {
 
   return c.json({
     data: {
-      autoShare: !!membership.auto_share,
+      autoShare: membership.auto_share,
       visibility: membership.auto_share_visibility || 'basic'
     }
   })
@@ -412,25 +408,24 @@ teams.get('/:id/auto-share', (c) => {
 
 // Update user's auto-share setting for a team
 teams.put('/:id/auto-share', async (c) => {
-  const db = getDb()
   const userId = c.get('user').userId
   const { id } = c.req.param()
   const body = await c.req.json<{ autoShare: boolean; visibility?: 'basic' | 'full' }>()
 
   // Verify user is team member
-  const membership = db.query(
-    'SELECT role FROM team_members WHERE team_id = ? AND user_id = ?'
-  ).get(id, userId)
+  const [membership] = await sql`
+    SELECT role FROM team_members WHERE team_id = ${id} AND user_id = ${userId}
+  `
 
   if (!membership) {
     return c.json({ error: 'Not a team member' }, 403)
   }
 
-  db.query(`
+  await sql`
     UPDATE team_members
-    SET auto_share = ?, auto_share_visibility = ?
-    WHERE team_id = ? AND user_id = ?
-  `).run(body.autoShare ? 1 : 0, body.visibility || 'basic', id, userId)
+    SET auto_share = ${body.autoShare}, auto_share_visibility = ${body.visibility || 'basic'}
+    WHERE team_id = ${id} AND user_id = ${userId}
+  `
 
   return c.json({
     data: {

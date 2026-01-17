@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
-import { initDb, getDb, generateId } from './db/index.js'
+import { initDb, sql, generateId } from './db/index.js'
 import { initGemini, isGeminiAvailable } from './services/gemini.js'
 import auth from './routes/auth.js'
 import contacts from './routes/contacts.js'
@@ -16,14 +16,14 @@ import teams from './routes/teams.js'
 
 const app = new Hono()
 
-// Initialize database
-initDb()
+// Initialize database (async)
+initDb().then(() => {
+  // Seed demo user if not exists
+  seedDemoData()
+})
 
 // Initialize Gemini AI
 initGemini()
-
-// Seed demo user if not exists
-seedDemoData()
 
 // Middleware
 app.use('*', logger())
@@ -50,13 +50,12 @@ app.route('/api/notifications', notifications)
 app.route('/api/teams', teams)
 
 // Seed demo data for testing
-function seedDemoData() {
-  const db = getDb()
+async function seedDemoData() {
   const MOCK_USER_ID = 'demo-user-001'
 
   // Check if demo user exists
-  const existingUser = db.query('SELECT id FROM users WHERE id = ?').get(MOCK_USER_ID)
-  if (existingUser) {
+  const existingUser = await sql`SELECT id FROM users WHERE id = ${MOCK_USER_ID}`
+  if (existingUser.length > 0) {
     console.log('Demo data already exists')
     return
   }
@@ -65,18 +64,12 @@ function seedDemoData() {
   const now = new Date().toISOString()
 
   // Create demo user
-  db.query(`
+  await sql`
     INSERT INTO users (id, email, name, avatar_url, google_id, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    MOCK_USER_ID,
-    'demo@summerloop.app',
-    'Demo User',
-    'https://ui-avatars.com/api/?name=Demo+User&background=39E079&color=fff',
-    'google-demo-001',
-    now,
-    now
-  )
+    VALUES (${MOCK_USER_ID}, 'demo@summerloop.app', 'Demo User',
+      'https://ui-avatars.com/api/?name=Demo+User&background=39E079&color=fff',
+      'google-demo-001', ${now}, ${now})
+  `
 
   // Create demo contacts
   const contactsData = [
@@ -91,10 +84,10 @@ function seedDemoData() {
   ]
 
   for (const contact of contactsData) {
-    db.query(`
+    await sql`
       INSERT INTO contacts (id, user_id, name, company, title, email, source, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(contact.id, MOCK_USER_ID, contact.name, contact.company, contact.title, contact.email, 'manual', now, now)
+      VALUES (${contact.id}, ${MOCK_USER_ID}, ${contact.name}, ${contact.company}, ${contact.title}, ${contact.email}, 'manual', ${now}, ${now})
+    `
   }
 
   // Create relationships
@@ -122,22 +115,11 @@ function seedDemoData() {
   ]
 
   for (const rel of relationshipsData) {
-    db.query(`
+    await sql`
       INSERT INTO relationships (id, user_id, contact_a_id, contact_b_id, is_user_relationship, relationship_type, strength, how_met, verified, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      generateId(),
-      MOCK_USER_ID,
-      rel.contactAId,
-      rel.contactBId || null,
-      rel.isUser ? 1 : 0,
-      rel.type,
-      rel.strength,
-      rel.howMet,
-      1,
-      now,
-      now
-    )
+      VALUES (${generateId()}, ${MOCK_USER_ID}, ${rel.contactAId}, ${rel.contactBId || null},
+        ${rel.isUser || false}, ${rel.type}, ${rel.strength}, ${rel.howMet}, true, ${now}, ${now})
+    `
   }
 
   console.log(`Seeded ${contactsData.length} contacts and ${relationshipsData.length} relationships`)

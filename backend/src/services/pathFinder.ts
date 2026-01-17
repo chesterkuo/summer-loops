@@ -1,4 +1,4 @@
-import { getDb } from '../db/index.js'
+import { sql } from '../db/postgres.js'
 import type { Contact, Relationship } from '../types/index.js'
 
 export interface PathNode {
@@ -54,21 +54,19 @@ interface GraphEdge {
 /**
  * Build adjacency list from relationships including team shared contacts
  */
-function buildGraph(userId: string): {
+async function buildGraph(userId: string): Promise<{
   nodes: Map<string, GraphNode>
   adjacency: Map<string, GraphEdge[]>
-} {
-  const db = getDb()
-
+}> {
   // Get all user's own contacts
-  const contacts = db.query(
-    'SELECT id, name, company, title FROM contacts WHERE user_id = ?'
-  ).all(userId) as Pick<Contact, 'id' | 'name' | 'company' | 'title'>[]
+  const contacts = await sql<Pick<Contact, 'id' | 'name' | 'company' | 'title'>[]>`
+    SELECT id, name, company, title FROM contacts WHERE user_id = ${userId}
+  `
 
   // Get all user's relationships
-  const relationships = db.query(
-    'SELECT * FROM relationships WHERE user_id = ?'
-  ).all(userId) as Relationship[]
+  const relationships = await sql<Relationship[]>`
+    SELECT * FROM relationships WHERE user_id = ${userId}
+  `
 
   const nodes = new Map<string, GraphNode>()
   const adjacency = new Map<string, GraphEdge[]>()
@@ -93,10 +91,10 @@ function buildGraph(userId: string): {
     adjacency.set(contact.id, [])
   }
 
-  // Add edges from user's relationships (using snake_case as returned from SQLite)
+  // Add edges from user's relationships (using snake_case as returned from PostgreSQL)
   for (const relationship of relationships) {
     const rel = relationship as any
-    const isUserRel = rel.is_user_relationship === 1
+    const isUserRel = rel.is_user_relationship === true
     const contactA = rel.contact_a_id
     const contactB = rel.contact_b_id
 
@@ -124,22 +122,22 @@ function buildGraph(userId: string): {
 
   // ============ CROSS-TEAM PATH DISCOVERY ============
   // Get teams the user is a member of
-  const userTeams = db.query(`
+  const userTeams = await sql<{ team_id: string; team_name: string }[]>`
     SELECT t.id as team_id, t.name as team_name
     FROM teams t
     JOIN team_members tm ON t.id = tm.team_id
-    WHERE tm.user_id = ?
-  `).all(userId) as { team_id: string; team_name: string }[]
+    WHERE tm.user_id = ${userId}
+  `
 
   // For each team, get shared contacts from other team members
   for (const team of userTeams) {
     // Get team members (excluding current user)
-    const teamMembers = db.query(`
+    const teamMembers = await sql<{ user_id: string; user_name: string }[]>`
       SELECT tm.user_id, u.name as user_name
       FROM team_members tm
       JOIN users u ON tm.user_id = u.id
-      WHERE tm.team_id = ? AND tm.user_id != ?
-    `).all(team.team_id, userId) as { user_id: string; user_name: string }[]
+      WHERE tm.team_id = ${team.team_id} AND tm.user_id != ${userId}
+    `
 
     // For each team member, get their shared contacts
     for (const member of teamMembers) {
@@ -183,18 +181,18 @@ function buildGraph(userId: string): {
       }
 
       // Get contacts shared by this team member
-      const sharedContacts = db.query(`
-        SELECT c.id, c.name, c.company, c.title, sc.visibility
-        FROM shared_contacts sc
-        JOIN contacts c ON sc.contact_id = c.id
-        WHERE sc.team_id = ? AND sc.shared_by_id = ?
-      `).all(team.team_id, member.user_id) as {
+      const sharedContacts = await sql<{
         id: string
         name: string
         company: string | null
         title: string | null
         visibility: string
-      }[]
+      }[]>`
+        SELECT c.id, c.name, c.company, c.title, sc.visibility
+        FROM shared_contacts sc
+        JOIN contacts c ON sc.contact_id = c.id
+        WHERE sc.team_id = ${team.team_id} AND sc.shared_by_id = ${member.user_id}
+      `
 
       // Add shared contacts as nodes (if not already added)
       for (const sharedContact of sharedContacts) {
@@ -247,13 +245,13 @@ function buildGraph(userId: string): {
  * Find introduction paths using modified Dijkstra's algorithm
  * Path strength = minimum edge strength along path (weakest link principle)
  */
-export function findPaths(
+export async function findPaths(
   userId: string,
   targetContactId: string,
   maxHops: number = 4,
   topK: number = 5
-): PathResult[] {
-  const { nodes, adjacency } = buildGraph(userId)
+): Promise<PathResult[]> {
+  const { nodes, adjacency } = await buildGraph(userId)
 
   if (!nodes.has(targetContactId)) {
     return []
@@ -353,25 +351,24 @@ export function findPaths(
  * Search for paths to a target by description (name, company, title)
  * Now includes cross-team search - searches user's contacts first, then team shared contacts
  */
-export function searchPaths(
+export async function searchPaths(
   userId: string,
   targetDescription: string,
   maxHops: number = 4,
   topK: number = 5
-): { targetContact: GraphNode | null; paths: PathResult[]; isTeamContact?: boolean } {
-  const db = getDb()
+): Promise<{ targetContact: GraphNode | null; paths: PathResult[]; isTeamContact?: boolean }> {
   const searchPattern = `%${targetDescription}%`
 
   // 1. First search user's own contacts
-  const ownMatches = db.query(`
+  const ownMatches = await sql<Pick<Contact, 'id' | 'name' | 'company' | 'title'>[]>`
     SELECT id, name, company, title FROM contacts
-    WHERE user_id = ? AND (name LIKE ? OR company LIKE ? OR title LIKE ?)
+    WHERE user_id = ${userId} AND (name ILIKE ${searchPattern} OR company ILIKE ${searchPattern} OR title ILIKE ${searchPattern})
     LIMIT 1
-  `).all(userId, searchPattern, searchPattern, searchPattern) as Pick<Contact, 'id' | 'name' | 'company' | 'title'>[]
+  `
 
   if (ownMatches.length > 0) {
     const target = ownMatches[0]
-    const paths = findPaths(userId, target.id, maxHops, topK)
+    const paths = await findPaths(userId, target.id, maxHops, topK)
 
     return {
       targetContact: {
@@ -387,32 +384,18 @@ export function searchPaths(
 
   // 2. If no own contact found, search team shared contacts
   // Get teams the user is a member of
-  const userTeams = db.query(`
-    SELECT team_id FROM team_members WHERE user_id = ?
-  `).all(userId) as { team_id: string }[]
+  const userTeams = await sql<{ team_id: string }[]>`
+    SELECT team_id FROM team_members WHERE user_id = ${userId}
+  `
 
   if (userTeams.length === 0) {
     return { targetContact: null, paths: [] }
   }
 
   const teamIds = userTeams.map(t => t.team_id)
-  const placeholders = teamIds.map(() => '?').join(',')
 
   // Search for matching contacts shared by teammates
-  const teamMatches = db.query(`
-    SELECT DISTINCT
-      c.id, c.name, c.company, c.title,
-      sc.team_id, t.name as team_name,
-      sc.shared_by_id as shared_by_user_id, u.name as shared_by_name
-    FROM shared_contacts sc
-    JOIN contacts c ON sc.contact_id = c.id
-    JOIN teams t ON sc.team_id = t.id
-    JOIN users u ON sc.shared_by_id = u.id
-    WHERE sc.team_id IN (${placeholders})
-      AND sc.shared_by_id != ?
-      AND (c.name LIKE ? OR c.company LIKE ? OR c.title LIKE ?)
-    LIMIT 1
-  `).all(...teamIds, userId, searchPattern, searchPattern, searchPattern) as {
+  const teamMatches = await sql<{
     id: string
     name: string
     company: string | null
@@ -421,7 +404,20 @@ export function searchPaths(
     team_name: string
     shared_by_user_id: string
     shared_by_name: string
-  }[]
+  }[]>`
+    SELECT DISTINCT
+      c.id, c.name, c.company, c.title,
+      sc.team_id, t.name as team_name,
+      sc.shared_by_id as shared_by_user_id, u.name as shared_by_name
+    FROM shared_contacts sc
+    JOIN contacts c ON sc.contact_id = c.id
+    JOIN teams t ON sc.team_id = t.id
+    JOIN users u ON sc.shared_by_id = u.id
+    WHERE sc.team_id = ANY(${teamIds})
+      AND sc.shared_by_id != ${userId}
+      AND (c.name ILIKE ${searchPattern} OR c.company ILIKE ${searchPattern} OR c.title ILIKE ${searchPattern})
+    LIMIT 1
+  `
 
   if (teamMatches.length === 0) {
     return { targetContact: null, paths: [] }
@@ -430,7 +426,7 @@ export function searchPaths(
   const teamTarget = teamMatches[0]
   // Use the special team contact ID format for path finding
   const teamContactId = `team:${teamTarget.team_id}:${teamTarget.id}`
-  const paths = findPaths(userId, teamContactId, maxHops, topK)
+  const paths = await findPaths(userId, teamContactId, maxHops, topK)
 
   return {
     targetContact: {

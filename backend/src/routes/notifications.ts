@@ -1,10 +1,9 @@
 import { Hono } from 'hono'
-import { getDb, generateId } from '../db/index.js'
+import { sql, generateId } from '../db/postgres.js'
 import type {
   Notification,
   CreateNotificationRequest,
   UpdateNotificationRequest,
-  Contact
 } from '../types/index.js'
 import { authMiddleware } from '../middleware/auth.js'
 
@@ -29,38 +28,40 @@ function mapNotification(row: any): Notification & { contactName?: string } {
 }
 
 // List all notifications (grouped by status)
-notifications.get('/', (c) => {
-  const db = getDb()
+notifications.get('/', async (c) => {
   const userId = c.get('user').userId
   const now = new Date().toISOString()
 
   // Get pending notifications that are due (remind_at <= now)
-  const pending = db.query(`
+  const pendingRows = await sql`
     SELECT n.*, c.name as contact_name
     FROM notifications n
     LEFT JOIN contacts c ON c.id = n.contact_id
-    WHERE n.user_id = ? AND n.status = 'pending' AND n.remind_at <= ?
+    WHERE n.user_id = ${userId} AND n.status = 'pending' AND n.remind_at <= ${now}
     ORDER BY n.remind_at ASC
-  `).all(userId, now).map(mapNotification)
+  `
+  const pending = pendingRows.map(mapNotification)
 
   // Get upcoming notifications (remind_at > now)
-  const upcoming = db.query(`
+  const upcomingRows = await sql`
     SELECT n.*, c.name as contact_name
     FROM notifications n
     LEFT JOIN contacts c ON c.id = n.contact_id
-    WHERE n.user_id = ? AND n.status = 'pending' AND n.remind_at > ?
+    WHERE n.user_id = ${userId} AND n.status = 'pending' AND n.remind_at > ${now}
     ORDER BY n.remind_at ASC
-  `).all(userId, now).map(mapNotification)
+  `
+  const upcoming = upcomingRows.map(mapNotification)
 
   // Get completed notifications (most recent first)
-  const done = db.query(`
+  const doneRows = await sql`
     SELECT n.*, c.name as contact_name
     FROM notifications n
     LEFT JOIN contacts c ON c.id = n.contact_id
-    WHERE n.user_id = ? AND n.status = 'done'
+    WHERE n.user_id = ${userId} AND n.status = 'done'
     ORDER BY n.completed_at DESC
     LIMIT 50
-  `).all(userId).map(mapNotification)
+  `
+  const done = doneRows.map(mapNotification)
 
   return c.json({
     pending,
@@ -71,17 +72,16 @@ notifications.get('/', (c) => {
 })
 
 // Get single notification
-notifications.get('/:id', (c) => {
-  const db = getDb()
+notifications.get('/:id', async (c) => {
   const userId = c.get('user').userId
   const { id } = c.req.param()
 
-  const row = db.query(`
+  const [row] = await sql`
     SELECT n.*, c.name as contact_name
     FROM notifications n
     LEFT JOIN contacts c ON c.id = n.contact_id
-    WHERE n.id = ? AND n.user_id = ?
-  `).get(id, userId)
+    WHERE n.id = ${id} AND n.user_id = ${userId}
+  `
 
   if (!row) {
     return c.json({ error: 'Notification not found' }, 404)
@@ -92,7 +92,6 @@ notifications.get('/:id', (c) => {
 
 // Create notification
 notifications.post('/', async (c) => {
-  const db = getDb()
   const userId = c.get('user').userId
   const body = await c.req.json<CreateNotificationRequest>()
 
@@ -102,9 +101,9 @@ notifications.post('/', async (c) => {
 
   // Validate contact exists if provided
   if (body.contactId) {
-    const contact = db.query(
-      'SELECT id FROM contacts WHERE id = ? AND user_id = ?'
-    ).get(body.contactId, userId) as Contact | null
+    const [contact] = await sql`
+      SELECT id FROM contacts WHERE id = ${body.contactId} AND user_id = ${userId}
+    `
 
     if (!contact) {
       return c.json({ error: 'Contact not found' }, 404)
@@ -114,39 +113,31 @@ notifications.post('/', async (c) => {
   const id = generateId()
   const now = new Date().toISOString()
 
-  db.query(`
+  await sql`
     INSERT INTO notifications (id, user_id, contact_id, note, remind_at, status, created_at)
-    VALUES (?, ?, ?, ?, ?, 'pending', ?)
-  `).run(
-    id,
-    userId,
-    body.contactId || null,
-    body.note || null,
-    body.remindAt,
-    now
-  )
+    VALUES (${id}, ${userId}, ${body.contactId || null}, ${body.note || null}, ${body.remindAt}, 'pending', ${now})
+  `
 
-  const row = db.query(`
+  const [row] = await sql`
     SELECT n.*, c.name as contact_name
     FROM notifications n
     LEFT JOIN contacts c ON c.id = n.contact_id
-    WHERE n.id = ?
-  `).get(id)
+    WHERE n.id = ${id}
+  `
 
   return c.json({ data: mapNotification(row) }, 201)
 })
 
 // Update notification
 notifications.patch('/:id', async (c) => {
-  const db = getDb()
   const userId = c.get('user').userId
   const { id } = c.req.param()
   const body = await c.req.json<UpdateNotificationRequest>()
 
   // Check if notification exists
-  const existing = db.query(
-    'SELECT * FROM notifications WHERE id = ? AND user_id = ?'
-  ).get(id, userId)
+  const [existing] = await sql`
+    SELECT * FROM notifications WHERE id = ${id} AND user_id = ${userId}
+  `
 
   if (!existing) {
     return c.json({ error: 'Notification not found' }, 404)
@@ -154,72 +145,73 @@ notifications.patch('/:id', async (c) => {
 
   // Validate contact exists if provided
   if (body.contactId) {
-    const contact = db.query(
-      'SELECT id FROM contacts WHERE id = ? AND user_id = ?'
-    ).get(body.contactId, userId) as Contact | null
+    const [contact] = await sql`
+      SELECT id FROM contacts WHERE id = ${body.contactId} AND user_id = ${userId}
+    `
 
     if (!contact) {
       return c.json({ error: 'Contact not found' }, 404)
     }
   }
 
-  const updates: string[] = []
-  const params: (string | null)[] = []
+  // Build update object
+  const updateValues: Record<string, any> = {}
 
   if (body.contactId !== undefined) {
-    updates.push('contact_id = ?')
-    params.push(body.contactId || null)
+    updateValues.contact_id = body.contactId || null
   }
   if (body.note !== undefined) {
-    updates.push('note = ?')
-    params.push(body.note || null)
+    updateValues.note = body.note || null
   }
   if (body.remindAt !== undefined) {
-    updates.push('remind_at = ?')
-    params.push(body.remindAt)
+    updateValues.remind_at = body.remindAt
   }
   if (body.status !== undefined) {
-    updates.push('status = ?')
-    params.push(body.status)
+    updateValues.status = body.status
     if (body.status === 'done') {
-      updates.push('completed_at = ?')
-      params.push(new Date().toISOString())
+      updateValues.completed_at = new Date().toISOString()
     }
   }
 
-  if (updates.length === 0) {
+  if (Object.keys(updateValues).length === 0) {
     return c.json({ error: 'No updates provided' }, 400)
   }
 
-  params.push(id)
+  // Execute update based on what fields are provided
+  await sql`
+    UPDATE notifications SET
+      contact_id = COALESCE(${updateValues.contact_id ?? null}::uuid, contact_id),
+      note = COALESCE(${updateValues.note ?? null}, note),
+      remind_at = COALESCE(${updateValues.remind_at ?? null}::timestamptz, remind_at),
+      status = COALESCE(${updateValues.status ?? null}, status),
+      completed_at = COALESCE(${updateValues.completed_at ?? null}::timestamptz, completed_at)
+    WHERE id = ${id}
+  `
 
-  db.query(`UPDATE notifications SET ${updates.join(', ')} WHERE id = ?`).run(...params)
-
-  const row = db.query(`
+  const [row] = await sql`
     SELECT n.*, c.name as contact_name
     FROM notifications n
     LEFT JOIN contacts c ON c.id = n.contact_id
-    WHERE n.id = ?
-  `).get(id)
+    WHERE n.id = ${id}
+  `
 
   return c.json({ data: mapNotification(row) })
 })
 
 // Delete notification
-notifications.delete('/:id', (c) => {
-  const db = getDb()
+notifications.delete('/:id', async (c) => {
   const userId = c.get('user').userId
   const { id } = c.req.param()
 
-  const existing = db.query(
-    'SELECT * FROM notifications WHERE id = ? AND user_id = ?'
-  ).get(id, userId)
+  const [existing] = await sql`
+    SELECT * FROM notifications WHERE id = ${id} AND user_id = ${userId}
+  `
 
   if (!existing) {
     return c.json({ error: 'Notification not found' }, 404)
   }
 
-  db.query('DELETE FROM notifications WHERE id = ?').run(id)
+  await sql`DELETE FROM notifications WHERE id = ${id}`
 
   return c.json({ message: 'Notification deleted successfully' })
 })

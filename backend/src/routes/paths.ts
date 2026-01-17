@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { getDb, generateId } from '../db/index.js'
+import { sql, generateId } from '../db/postgres.js'
 import { findPaths, searchPaths } from '../services/pathFinder.js'
 import { generateIntroMessage, isGeminiAvailable } from '../services/gemini.js'
 import { authMiddleware } from '../middleware/auth.js'
@@ -37,7 +37,7 @@ paths.post('/search', async (c) => {
 
   if (body.targetContactId) {
     // Direct path search to specific contact
-    const pathResults = findPaths(userId, body.targetContactId, maxHops, topK)
+    const pathResults = await findPaths(userId, body.targetContactId, maxHops, topK)
 
     return c.json({
       data: {
@@ -47,7 +47,7 @@ paths.post('/search', async (c) => {
     })
   } else {
     // Search by description (includes cross-team search)
-    const result = searchPaths(userId, body.targetDescription!, maxHops, topK)
+    const result = await searchPaths(userId, body.targetDescription!, maxHops, topK)
 
     if (!result.targetContact) {
       return c.json({
@@ -104,50 +104,53 @@ paths.post('/generate-message', async (c) => {
 // ============ Introduction Requests ============
 
 // List introduction requests
-paths.get('/requests', (c) => {
-  const db = getDb()
+paths.get('/requests', async (c) => {
   const userId = c.get('user').userId
   const { status, limit = '50', offset = '0' } = c.req.query()
 
-  let query = 'SELECT * FROM introduction_requests WHERE user_id = ?'
-  const params: (string | number)[] = [userId]
+  const limitNum = Number(limit)
+  const offsetNum = Number(offset)
+
+  let requests: IntroductionRequest[]
+  let totalResult: { total: string }[]
 
   if (status) {
-    query += ' AND status = ?'
-    params.push(status)
+    requests = await sql<IntroductionRequest[]>`
+      SELECT * FROM introduction_requests
+      WHERE user_id = ${userId} AND status = ${status}
+      ORDER BY created_at DESC LIMIT ${limitNum} OFFSET ${offsetNum}
+    `
+    totalResult = await sql<{ total: string }[]>`
+      SELECT COUNT(*) as total FROM introduction_requests
+      WHERE user_id = ${userId} AND status = ${status}
+    `
+  } else {
+    requests = await sql<IntroductionRequest[]>`
+      SELECT * FROM introduction_requests
+      WHERE user_id = ${userId}
+      ORDER BY created_at DESC LIMIT ${limitNum} OFFSET ${offsetNum}
+    `
+    totalResult = await sql<{ total: string }[]>`
+      SELECT COUNT(*) as total FROM introduction_requests WHERE user_id = ${userId}
+    `
   }
-
-  query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
-  params.push(Number(limit), Number(offset))
-
-  const requests = db.query(query).all(...params) as IntroductionRequest[]
-
-  // Get total count
-  let countQuery = 'SELECT COUNT(*) as total FROM introduction_requests WHERE user_id = ?'
-  const countParams: string[] = [userId]
-  if (status) {
-    countQuery += ' AND status = ?'
-    countParams.push(status)
-  }
-  const countResult = db.query(countQuery).get(...countParams) as { total: number }
 
   return c.json({
     data: requests,
-    total: countResult.total,
-    limit: Number(limit),
-    offset: Number(offset)
+    total: Number(totalResult[0].total),
+    limit: limitNum,
+    offset: offsetNum
   })
 })
 
 // Get single introduction request
-paths.get('/requests/:id', (c) => {
-  const db = getDb()
+paths.get('/requests/:id', async (c) => {
   const userId = c.get('user').userId
   const { id } = c.req.param()
 
-  const request = db.query(
-    'SELECT * FROM introduction_requests WHERE id = ? AND user_id = ?'
-  ).get(id, userId) as IntroductionRequest | null
+  const [request] = await sql<IntroductionRequest[]>`
+    SELECT * FROM introduction_requests WHERE id = ${id} AND user_id = ${userId}
+  `
 
   if (!request) {
     return c.json({ error: 'Introduction request not found' }, 404)
@@ -158,7 +161,6 @@ paths.get('/requests/:id', (c) => {
 
 // Create introduction request
 paths.post('/requests', async (c) => {
-  const db = getDb()
   const userId = c.get('user').userId
   const body = await c.req.json<CreateIntroductionRequest>()
 
@@ -168,9 +170,9 @@ paths.post('/requests', async (c) => {
 
   // If targetContactId provided, verify it exists
   if (body.targetContactId) {
-    const contact = db.query(
-      'SELECT id FROM contacts WHERE id = ? AND user_id = ?'
-    ).get(body.targetContactId, userId)
+    const [contact] = await sql`
+      SELECT id FROM contacts WHERE id = ${body.targetContactId} AND user_id = ${userId}
+    `
 
     if (!contact) {
       return c.json({ error: 'Target contact not found' }, 404)
@@ -180,86 +182,73 @@ paths.post('/requests', async (c) => {
   const id = generateId()
   const now = new Date().toISOString()
 
-  db.query(`
+  await sql`
     INSERT INTO introduction_requests (
       id, user_id, target_contact_id, target_description,
       path_data, generated_message, status, created_at, updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id,
-    userId,
-    body.targetContactId || null,
-    body.targetDescription || null,
-    body.pathData ? JSON.stringify(body.pathData) : null,
-    body.generatedMessage || null,
-    body.status || 'draft',
-    now,
-    now
-  )
+    VALUES (
+      ${id}, ${userId}, ${body.targetContactId || null}, ${body.targetDescription || null},
+      ${body.pathData ? JSON.stringify(body.pathData) : null}::jsonb,
+      ${body.generatedMessage || null}, ${body.status || 'draft'}, ${now}, ${now}
+    )
+  `
 
-  const request = db.query('SELECT * FROM introduction_requests WHERE id = ?').get(id) as IntroductionRequest
+  const [request] = await sql<IntroductionRequest[]>`SELECT * FROM introduction_requests WHERE id = ${id}`
 
   return c.json({ data: request }, 201)
 })
 
 // Update introduction request
 paths.put('/requests/:id', async (c) => {
-  const db = getDb()
   const userId = c.get('user').userId
   const { id } = c.req.param()
   const body = await c.req.json<UpdateIntroductionRequest>()
 
-  const existing = db.query(
-    'SELECT * FROM introduction_requests WHERE id = ? AND user_id = ?'
-  ).get(id, userId) as IntroductionRequest | null
+  const [existing] = await sql<IntroductionRequest[]>`
+    SELECT * FROM introduction_requests WHERE id = ${id} AND user_id = ${userId}
+  `
 
   if (!existing) {
     return c.json({ error: 'Introduction request not found' }, 404)
   }
 
-  const updates: string[] = []
-  const params: (string | null)[] = []
+  const hasStatus = body.status !== undefined
+  const hasMessage = body.generatedMessage !== undefined
 
-  if (body.status !== undefined) {
-    updates.push('status = ?')
-    params.push(body.status)
-  }
-  if (body.generatedMessage !== undefined) {
-    updates.push('generated_message = ?')
-    params.push(body.generatedMessage || null)
-  }
-
-  if (updates.length === 0) {
+  if (!hasStatus && !hasMessage) {
     return c.json({ error: 'No updates provided' }, 400)
   }
 
-  updates.push('updated_at = ?')
-  params.push(new Date().toISOString())
-  params.push(id)
+  const now = new Date().toISOString()
 
-  db.query(`UPDATE introduction_requests SET ${updates.join(', ')} WHERE id = ?`).run(...params)
+  await sql`
+    UPDATE introduction_requests SET
+      status = COALESCE(${hasStatus ? body.status : null}, status),
+      generated_message = ${hasMessage ? (body.generatedMessage || null) : existing.generated_message},
+      updated_at = ${now}
+    WHERE id = ${id}
+  `
 
-  const request = db.query('SELECT * FROM introduction_requests WHERE id = ?').get(id) as IntroductionRequest
+  const [request] = await sql<IntroductionRequest[]>`SELECT * FROM introduction_requests WHERE id = ${id}`
 
   return c.json({ data: request })
 })
 
 // Delete introduction request
-paths.delete('/requests/:id', (c) => {
-  const db = getDb()
+paths.delete('/requests/:id', async (c) => {
   const userId = c.get('user').userId
   const { id } = c.req.param()
 
-  const existing = db.query(
-    'SELECT * FROM introduction_requests WHERE id = ? AND user_id = ?'
-  ).get(id, userId)
+  const [existing] = await sql`
+    SELECT * FROM introduction_requests WHERE id = ${id} AND user_id = ${userId}
+  `
 
   if (!existing) {
     return c.json({ error: 'Introduction request not found' }, 404)
   }
 
-  db.query('DELETE FROM introduction_requests WHERE id = ?').run(id)
+  await sql`DELETE FROM introduction_requests WHERE id = ${id}`
 
   return c.json({ message: 'Introduction request deleted' })
 })

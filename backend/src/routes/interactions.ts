@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { getDb, generateId } from '../db/index.js'
+import { sql, generateId } from '../db/postgres.js'
 import { authMiddleware } from '../middleware/auth.js'
 import type { Interaction, CreateInteractionRequest } from '../types/index.js'
 
@@ -9,59 +9,74 @@ const interactions = new Hono()
 interactions.use('*', authMiddleware)
 
 // List all interactions
-interactions.get('/', (c) => {
-  const db = getDb()
+interactions.get('/', async (c) => {
   const userId = c.get('user').userId
   const { contactId, type, limit = '50', offset = '0' } = c.req.query()
 
-  let query = 'SELECT * FROM interactions WHERE user_id = ?'
-  const params: (string | number)[] = [userId]
+  const limitNum = Number(limit)
+  const offsetNum = Number(offset)
 
-  if (contactId) {
-    query += ' AND contact_id = ?'
-    params.push(contactId)
+  // Build query based on filters
+  let rows: Interaction[]
+  let totalResult: { total: string }[]
+
+  if (contactId && type) {
+    rows = await sql<Interaction[]>`
+      SELECT * FROM interactions
+      WHERE user_id = ${userId} AND contact_id = ${contactId} AND type = ${type}
+      ORDER BY occurred_at DESC LIMIT ${limitNum} OFFSET ${offsetNum}
+    `
+    totalResult = await sql<{ total: string }[]>`
+      SELECT COUNT(*) as total FROM interactions
+      WHERE user_id = ${userId} AND contact_id = ${contactId} AND type = ${type}
+    `
+  } else if (contactId) {
+    rows = await sql<Interaction[]>`
+      SELECT * FROM interactions
+      WHERE user_id = ${userId} AND contact_id = ${contactId}
+      ORDER BY occurred_at DESC LIMIT ${limitNum} OFFSET ${offsetNum}
+    `
+    totalResult = await sql<{ total: string }[]>`
+      SELECT COUNT(*) as total FROM interactions
+      WHERE user_id = ${userId} AND contact_id = ${contactId}
+    `
+  } else if (type) {
+    rows = await sql<Interaction[]>`
+      SELECT * FROM interactions
+      WHERE user_id = ${userId} AND type = ${type}
+      ORDER BY occurred_at DESC LIMIT ${limitNum} OFFSET ${offsetNum}
+    `
+    totalResult = await sql<{ total: string }[]>`
+      SELECT COUNT(*) as total FROM interactions
+      WHERE user_id = ${userId} AND type = ${type}
+    `
+  } else {
+    rows = await sql<Interaction[]>`
+      SELECT * FROM interactions
+      WHERE user_id = ${userId}
+      ORDER BY occurred_at DESC LIMIT ${limitNum} OFFSET ${offsetNum}
+    `
+    totalResult = await sql<{ total: string }[]>`
+      SELECT COUNT(*) as total FROM interactions WHERE user_id = ${userId}
+    `
   }
-
-  if (type) {
-    query += ' AND type = ?'
-    params.push(type)
-  }
-
-  query += ' ORDER BY occurred_at DESC LIMIT ? OFFSET ?'
-  params.push(Number(limit), Number(offset))
-
-  const rows = db.query(query).all(...params) as Interaction[]
-
-  // Get total count
-  let countQuery = 'SELECT COUNT(*) as total FROM interactions WHERE user_id = ?'
-  const countParams: string[] = [userId]
-  if (contactId) {
-    countQuery += ' AND contact_id = ?'
-    countParams.push(contactId)
-  }
-  if (type) {
-    countQuery += ' AND type = ?'
-    countParams.push(type)
-  }
-  const countResult = db.query(countQuery).get(...countParams) as { total: number }
 
   return c.json({
     data: rows,
-    total: countResult.total,
-    limit: Number(limit),
-    offset: Number(offset)
+    total: Number(totalResult[0].total),
+    limit: limitNum,
+    offset: offsetNum
   })
 })
 
 // Get single interaction
-interactions.get('/:id', (c) => {
-  const db = getDb()
+interactions.get('/:id', async (c) => {
   const userId = c.get('user').userId
   const { id } = c.req.param()
 
-  const interaction = db.query(
-    'SELECT * FROM interactions WHERE id = ? AND user_id = ?'
-  ).get(id, userId) as Interaction | null
+  const [interaction] = await sql<Interaction[]>`
+    SELECT * FROM interactions WHERE id = ${id} AND user_id = ${userId}
+  `
 
   if (!interaction) {
     return c.json({ error: 'Interaction not found' }, 404)
@@ -72,7 +87,6 @@ interactions.get('/:id', (c) => {
 
 // Create interaction
 interactions.post('/', async (c) => {
-  const db = getDb()
   const userId = c.get('user').userId
   const body = await c.req.json<CreateInteractionRequest>()
 
@@ -89,9 +103,9 @@ interactions.post('/', async (c) => {
   }
 
   // Verify contact belongs to user
-  const contact = db.query(
-    'SELECT id FROM contacts WHERE id = ? AND user_id = ?'
-  ).get(body.contactId, userId)
+  const [contact] = await sql`
+    SELECT id FROM contacts WHERE id = ${body.contactId} AND user_id = ${userId}
+  `
 
   if (!contact) {
     return c.json({ error: 'Contact not found' }, 404)
@@ -100,97 +114,80 @@ interactions.post('/', async (c) => {
   const id = generateId()
   const now = new Date().toISOString()
 
-  db.query(`
-    INSERT INTO interactions (id, user_id, contact_id, type, notes, occurred_at, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id,
-    userId,
-    body.contactId,
-    body.type,
-    body.notes || null,
-    body.occurredAt,
-    now
-  )
+  await sql`
+    INSERT INTO interactions (id, user_id, contact_id, type, title, notes, occurred_at, created_at)
+    VALUES (${id}, ${userId}, ${body.contactId}, ${body.type}, ${body.title || null}, ${body.notes || null}, ${body.occurredAt}, ${now})
+  `
 
   // Update relationship last_interaction_at if relationship exists
-  db.query(`
+  await sql`
     UPDATE relationships
-    SET last_interaction_at = ?, updated_at = ?
-    WHERE user_id = ? AND is_user_relationship = 1 AND contact_a_id = ?
-  `).run(body.occurredAt, now, userId, body.contactId)
+    SET last_interaction_at = ${body.occurredAt}, updated_at = ${now}
+    WHERE user_id = ${userId} AND is_user_relationship = true AND contact_a_id = ${body.contactId}
+  `
 
-  const interaction = db.query('SELECT * FROM interactions WHERE id = ?').get(id) as Interaction
+  const [interaction] = await sql<Interaction[]>`SELECT * FROM interactions WHERE id = ${id}`
 
   return c.json({ data: interaction }, 201)
 })
 
 // Update interaction
 interactions.put('/:id', async (c) => {
-  const db = getDb()
   const userId = c.get('user').userId
   const { id } = c.req.param()
   const body = await c.req.json<Partial<CreateInteractionRequest>>()
 
-  const existing = db.query(
-    'SELECT * FROM interactions WHERE id = ? AND user_id = ?'
-  ).get(id, userId) as Interaction | null
+  const [existing] = await sql<Interaction[]>`
+    SELECT * FROM interactions WHERE id = ${id} AND user_id = ${userId}
+  `
 
   if (!existing) {
     return c.json({ error: 'Interaction not found' }, 404)
   }
 
-  const updates: string[] = []
-  const params: (string | null)[] = []
+  // Build update values
+  const hasType = body.type !== undefined
+  const hasNotes = body.notes !== undefined
+  const hasOccurredAt = body.occurredAt !== undefined
 
-  if (body.type !== undefined) {
-    updates.push('type = ?')
-    params.push(body.type)
-  }
-  if (body.notes !== undefined) {
-    updates.push('notes = ?')
-    params.push(body.notes || null)
-  }
-  if (body.occurredAt !== undefined) {
-    updates.push('occurred_at = ?')
-    params.push(body.occurredAt)
-  }
-
-  if (updates.length === 0) {
+  if (!hasType && !hasNotes && !hasOccurredAt) {
     return c.json({ error: 'No updates provided' }, 400)
   }
 
-  params.push(id)
+  // Perform update with explicit fields
+  await sql`
+    UPDATE interactions SET
+      type = COALESCE(${hasType ? body.type : null}, type),
+      notes = ${hasNotes ? (body.notes || null) : existing.notes},
+      occurred_at = COALESCE(${hasOccurredAt ? body.occurredAt : null}::timestamptz, occurred_at)
+    WHERE id = ${id}
+  `
 
-  db.query(`UPDATE interactions SET ${updates.join(', ')} WHERE id = ?`).run(...params)
-
-  const interaction = db.query('SELECT * FROM interactions WHERE id = ?').get(id) as Interaction
+  const [interaction] = await sql<Interaction[]>`SELECT * FROM interactions WHERE id = ${id}`
 
   return c.json({ data: interaction })
 })
 
 // Delete interaction
-interactions.delete('/:id', (c) => {
-  const db = getDb()
+interactions.delete('/:id', async (c) => {
   const userId = c.get('user').userId
   const { id } = c.req.param()
 
-  const existing = db.query(
-    'SELECT * FROM interactions WHERE id = ? AND user_id = ?'
-  ).get(id, userId)
+  const [existing] = await sql`
+    SELECT * FROM interactions WHERE id = ${id} AND user_id = ${userId}
+  `
 
   if (!existing) {
     return c.json({ error: 'Interaction not found' }, 404)
   }
 
-  db.query('DELETE FROM interactions WHERE id = ?').run(id)
+  await sql`DELETE FROM interactions WHERE id = ${id}`
 
   return c.json({ message: 'Interaction deleted' })
 })
 
 // Get interaction reminders (contacts with no recent interactions)
-interactions.get('/reminders/list', (c) => {
-  const db = getDb()
+interactions.get('/reminders/list', async (c) => {
   const userId = c.get('user').userId
   const { days = '30' } = c.req.query()
 
@@ -199,19 +196,19 @@ interactions.get('/reminders/list', (c) => {
   const cutoffDate = daysAgo.toISOString()
 
   // Find contacts with user relationships that haven't been interacted with recently
-  const contacts = db.query(`
+  const contacts = await sql`
     SELECT c.*, r.strength, r.last_interaction_at,
            (SELECT MAX(i.occurred_at) FROM interactions i WHERE i.contact_id = c.id) as last_interaction
     FROM contacts c
-    JOIN relationships r ON r.contact_a_id = c.id AND r.is_user_relationship = 1
-    WHERE c.user_id = ?
+    JOIN relationships r ON r.contact_a_id = c.id AND r.is_user_relationship = true
+    WHERE c.user_id = ${userId}
     AND (
       r.last_interaction_at IS NULL
-      OR r.last_interaction_at < ?
+      OR r.last_interaction_at < ${cutoffDate}
     )
     ORDER BY r.strength DESC, r.last_interaction_at ASC
     LIMIT 20
-  `).all(userId, cutoffDate)
+  `
 
   return c.json({
     data: contacts,

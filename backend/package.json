@@ -6,15 +6,23 @@
   "scripts": {
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
-    "db:migrate": "bun run src/db/migrate.ts"
+    "db:init-sqlite": "bun run src/db/migrate.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:migrate-data": "bun run src/db/migrate-data.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "drizzle-orm": "^0.36.0",
     "hono": "^4.0.0",
-    "jose": "^5.2.0"
+    "jose": "^5.2.0",
+    "postgres": "^3.4.4"
   },
   "devDependencies": {
     "@types/bun": "latest",
+    "drizzle-kit": "^0.30.0",
     "typescript": "^5.3.0"
   }
 }

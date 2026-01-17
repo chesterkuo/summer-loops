@@ -87,11 +87,23 @@ This creates: `warmly-voltbuilder-YYYYMMDD-HHMMSS.zip`
 
 | Setting | Value |
 |---------|-------|
-| App ID | `com.warmly.app` |
+| App ID | `com.mywarmly.app` |
 | App Name | `Warmly` |
 | Version | `1.0.0` |
 | Min iOS | `13.0` |
 | API URL | `https://mywarmly.app/api` |
+
+### Build Number (Bundle Version)
+
+The build script (`./scripts/build-voltbuilder.sh`) auto-increments the build number in **three locations**:
+
+| File | Setting |
+|------|---------|
+| `frontend/voltbuilder.json` | `build` and `ios.buildNumber` |
+| `frontend/config.xml` | `ios-CFBundleVersion` attribute |
+| `frontend/ios/App/App.xcodeproj/project.pbxproj` | `CURRENT_PROJECT_VERSION` |
+
+**Important:** All three must be in sync for App Store Connect upload to succeed.
 
 ### Icon Sizes Generated
 40, 58, 60, 76, 80, 87, 120, 152, 167, 180, 512, 1024 pixels
@@ -110,6 +122,11 @@ This creates: `warmly-voltbuilder-YYYYMMDD-HHMMSS.zip`
 **Styling broken:**
 - Ensure `npm run build` completed successfully
 - Check that Tailwind CSS is bundled (no CDN dependency)
+
+**App Store Connect: "Bundle version must be higher":**
+- Ensure all three build number locations are in sync (see "Build Number" section)
+- The Xcode project's `CURRENT_PROJECT_VERSION` in `project.pbxproj` is the actual value used
+- Run `./scripts/build-voltbuilder.sh` which auto-increments all locations
 
 ---
 
@@ -149,10 +166,15 @@ This creates: `warmly-voltbuilder-YYYYMMDD-HHMMSS.zip`
 
 ### Update App Version
 
-Edit these files:
-1. `frontend/voltbuilder.json` - `version` and `buildNumber`
+**Marketing Version** (e.g., 1.0.0 → 1.1.0):
+1. `frontend/voltbuilder.json` - `version`
 2. `frontend/config.xml` - `version` attribute
-3. `frontend/package.json` - `version` (optional)
+3. `frontend/ios/App/App.xcodeproj/project.pbxproj` - `MARKETING_VERSION`
+4. `frontend/package.json` - `version` (optional)
+
+**Build Number** (auto-incremented by build script):
+- The build script handles this automatically
+- To manually set: edit all three locations listed in "Build Number" section above
 
 ### Update App Icon
 

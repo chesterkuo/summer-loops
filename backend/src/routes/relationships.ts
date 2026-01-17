@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { getDb, generateId } from '../db/index.js'
+import { sql, generateId } from '../db/postgres.js'
 import type { CreateRelationshipRequest, UpdateRelationshipRequest, Relationship, Contact } from '../types/index.js'
 import { authMiddleware } from '../middleware/auth.js'
 
@@ -9,40 +9,43 @@ const relationships = new Hono()
 relationships.use('*', authMiddleware)
 
 // List all relationships
-relationships.get('/', (c) => {
-  const db = getDb()
+relationships.get('/', async (c) => {
   const userId = c.get('user').userId
   const { contactId } = c.req.query()
 
-  let query = 'SELECT * FROM relationships WHERE user_id = ?'
-  const params: string[] = [userId]
+  let rows: Relationship[]
 
   if (contactId) {
-    query += ' AND (contact_a_id = ? OR contact_b_id = ?)'
-    params.push(contactId, contactId)
+    rows = await sql<Relationship[]>`
+      SELECT * FROM relationships
+      WHERE user_id = ${userId}
+      AND (contact_a_id = ${contactId} OR contact_b_id = ${contactId})
+      ORDER BY updated_at DESC
+    `
+  } else {
+    rows = await sql<Relationship[]>`
+      SELECT * FROM relationships
+      WHERE user_id = ${userId}
+      ORDER BY updated_at DESC
+    `
   }
-
-  query += ' ORDER BY updated_at DESC'
-
-  const rows = db.query(query).all(...params) as Relationship[]
 
   return c.json({ data: rows })
 })
 
 // Get graph data for visualization (includes team shared contacts)
-relationships.get('/graph', (c) => {
-  const db = getDb()
+relationships.get('/graph', async (c) => {
   const userId = c.get('user').userId
 
   // Get all contacts for this user
-  const contacts = db.query(
-    'SELECT id, name, company, title FROM contacts WHERE user_id = ?'
-  ).all(userId) as Pick<Contact, 'id' | 'name' | 'company' | 'title'>[]
+  const contacts = await sql<Pick<Contact, 'id' | 'name' | 'company' | 'title'>[]>`
+    SELECT id, name, company, title FROM contacts WHERE user_id = ${userId}
+  `
 
   // Get all relationships
-  const rels = db.query(
-    'SELECT * FROM relationships WHERE user_id = ?'
-  ).all(userId) as Relationship[]
+  const rels = await sql<Relationship[]>`
+    SELECT * FROM relationships WHERE user_id = ${userId}
+  `
 
   // Build nodes (including user as center)
   const nodes: any[] = [
@@ -56,9 +59,9 @@ relationships.get('/graph', (c) => {
       isTeammate: false
     },
     ...contacts.map(contact => {
-      // Check if direct connection to user (is_user_relationship is stored as 0/1 integer)
+      // Check if direct connection to user (is_user_relationship is boolean in PostgreSQL)
       const directConnection = rels.find(
-        r => (r as any).is_user_relationship === 1 &&
+        r => (r as any).is_user_relationship === true &&
         ((r as any).contact_a_id === contact.id || (r as any).contact_b_id === contact.id)
       )
       return {
@@ -73,12 +76,12 @@ relationships.get('/graph', (c) => {
     })
   ]
 
-  // Build edges (using snake_case as returned from SQLite)
+  // Build edges (using snake_case as returned from PostgreSQL)
   const edges: any[] = rels.map(rel => {
     const r = rel as any
     return {
-      source: r.is_user_relationship === 1 ? 'user' : r.contact_a_id,
-      target: r.is_user_relationship === 1 ? r.contact_a_id : (r.contact_b_id || r.contact_a_id),
+      source: r.is_user_relationship === true ? 'user' : r.contact_a_id,
+      target: r.is_user_relationship === true ? r.contact_a_id : (r.contact_b_id || r.contact_a_id),
       strength: r.strength,
       type: r.relationship_type,
       isTeamEdge: false
@@ -87,24 +90,24 @@ relationships.get('/graph', (c) => {
 
   // ============ ADD TEAM SHARED CONTACTS ============
   // Get teams the user is a member of
-  const userTeams = db.query(`
+  const userTeams = await sql<{ team_id: string; team_name: string }[]>`
     SELECT t.id as team_id, t.name as team_name
     FROM teams t
     JOIN team_members tm ON t.id = tm.team_id
-    WHERE tm.user_id = ?
-  `).all(userId) as { team_id: string; team_name: string }[]
+    WHERE tm.user_id = ${userId}
+  `
 
   const addedTeammates = new Set<string>()
   const addedTeamContacts = new Set<string>()
 
   for (const team of userTeams) {
     // Get team members (excluding current user)
-    const teamMembers = db.query(`
+    const teamMembers = await sql<{ user_id: string; user_name: string }[]>`
       SELECT tm.user_id, u.name as user_name
       FROM team_members tm
       JOIN users u ON tm.user_id = u.id
-      WHERE tm.team_id = ? AND tm.user_id != ?
-    `).all(team.team_id, userId) as { user_id: string; user_name: string }[]
+      WHERE tm.team_id = ${team.team_id} AND tm.user_id != ${userId}
+    `
 
     for (const member of teamMembers) {
       const teammateNodeId = `teammate:${member.user_id}`
@@ -134,18 +137,18 @@ relationships.get('/graph', (c) => {
       }
 
       // Get contacts shared by this team member
-      const sharedContacts = db.query(`
-        SELECT c.id, c.name, c.company, c.title, sc.visibility
-        FROM shared_contacts sc
-        JOIN contacts c ON sc.contact_id = c.id
-        WHERE sc.team_id = ? AND sc.shared_by_id = ?
-      `).all(team.team_id, member.user_id) as {
+      const sharedContacts = await sql<{
         id: string
         name: string
         company: string | null
         title: string | null
         visibility: string
-      }[]
+      }[]>`
+        SELECT c.id, c.name, c.company, c.title, sc.visibility
+        FROM shared_contacts sc
+        JOIN contacts c ON sc.contact_id = c.id
+        WHERE sc.team_id = ${team.team_id} AND sc.shared_by_id = ${member.user_id}
+      `
 
       for (const sharedContact of sharedContacts) {
         const teamContactId = `team:${team.team_id}:${sharedContact.id}`
@@ -188,7 +191,6 @@ relationships.get('/graph', (c) => {
 
 // Create relationship
 relationships.post('/', async (c) => {
-  const db = getDb()
   const userId = c.get('user').userId
   const body = await c.req.json<CreateRelationshipRequest>()
 
@@ -197,18 +199,18 @@ relationships.post('/', async (c) => {
   }
 
   // Verify contacts exist
-  const contactA = db.query(
-    'SELECT id FROM contacts WHERE id = ? AND user_id = ?'
-  ).get(body.contactAId, userId)
+  const [contactA] = await sql`
+    SELECT id FROM contacts WHERE id = ${body.contactAId} AND user_id = ${userId}
+  `
 
   if (!contactA) {
     return c.json({ error: 'Contact A not found' }, 404)
   }
 
   if (body.contactBId) {
-    const contactB = db.query(
-      'SELECT id FROM contacts WHERE id = ? AND user_id = ?'
-    ).get(body.contactBId, userId)
+    const [contactB] = await sql`
+      SELECT id FROM contacts WHERE id = ${body.contactBId} AND user_id = ${userId}
+    `
 
     if (!contactB) {
       return c.json({ error: 'Contact B not found' }, 404)
@@ -216,10 +218,11 @@ relationships.post('/', async (c) => {
   }
 
   // Check for duplicate
-  const existing = db.query(`
+  const [existing] = await sql`
     SELECT id FROM relationships
-    WHERE user_id = ? AND contact_a_id = ? AND (contact_b_id = ? OR (contact_b_id IS NULL AND ? IS NULL))
-  `).get(userId, body.contactAId, body.contactBId || null, body.contactBId || null)
+    WHERE user_id = ${userId} AND contact_a_id = ${body.contactAId}
+    AND (contact_b_id = ${body.contactBId || null} OR (contact_b_id IS NULL AND ${body.contactBId || null} IS NULL))
+  `
 
   if (existing) {
     return c.json({ error: 'Relationship already exists' }, 409)
@@ -228,123 +231,103 @@ relationships.post('/', async (c) => {
   const id = generateId()
   const now = new Date().toISOString()
 
-  db.query(`
+  await sql`
     INSERT INTO relationships (
       id, user_id, contact_a_id, contact_b_id, is_user_relationship,
       relationship_type, strength, how_met, introduced_by_id,
       is_ai_inferred, verified, created_at, updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id,
-    userId,
-    body.contactAId,
-    body.contactBId || null,
-    body.isUserRelationship ? 1 : 0,
-    body.relationshipType || null,
-    body.strength || 3,
-    body.howMet || null,
-    body.introducedById || null,
-    0, // not AI inferred
-    1, // verified since user created it
-    now,
-    now
-  )
+    VALUES (
+      ${id}, ${userId}, ${body.contactAId}, ${body.contactBId || null},
+      ${body.isUserRelationship || false}, ${body.relationshipType || null},
+      ${body.strength || 3}, ${body.howMet || null}, ${body.introducedById || null},
+      false, true, ${now}, ${now}
+    )
+  `
 
-  const relationship = db.query('SELECT * FROM relationships WHERE id = ?').get(id) as Relationship
+  const [relationship] = await sql<Relationship[]>`SELECT * FROM relationships WHERE id = ${id}`
 
   return c.json({ data: relationship }, 201)
 })
 
 // Update relationship
 relationships.put('/:id', async (c) => {
-  const db = getDb()
   const userId = c.get('user').userId
   const { id } = c.req.param()
   const body = await c.req.json<UpdateRelationshipRequest>()
 
-  const existing = db.query(
-    'SELECT * FROM relationships WHERE id = ? AND user_id = ?'
-  ).get(id, userId) as Relationship | null
+  const [existing] = await sql<Relationship[]>`
+    SELECT * FROM relationships WHERE id = ${id} AND user_id = ${userId}
+  `
 
   if (!existing) {
     return c.json({ error: 'Relationship not found' }, 404)
   }
 
-  const updates: string[] = []
-  const params: (string | number | null)[] = []
+  const hasRelType = body.relationshipType !== undefined
+  const hasStrength = body.strength !== undefined
+  const hasHowMet = body.howMet !== undefined
+  const hasVerified = body.verified !== undefined
 
-  if (body.relationshipType !== undefined) {
-    updates.push('relationship_type = ?')
-    params.push(body.relationshipType || null)
-  }
-  if (body.strength !== undefined) {
-    updates.push('strength = ?')
-    params.push(body.strength)
-  }
-  if (body.howMet !== undefined) {
-    updates.push('how_met = ?')
-    params.push(body.howMet || null)
-  }
-  if (body.verified !== undefined) {
-    updates.push('verified = ?')
-    params.push(body.verified ? 1 : 0)
-  }
-
-  if (updates.length === 0) {
+  if (!hasRelType && !hasStrength && !hasHowMet && !hasVerified) {
     return c.json({ error: 'No updates provided' }, 400)
   }
 
-  updates.push('updated_at = ?')
-  params.push(new Date().toISOString())
-  params.push(id)
+  const now = new Date().toISOString()
 
-  db.query(`UPDATE relationships SET ${updates.join(', ')} WHERE id = ?`).run(...params)
+  await sql`
+    UPDATE relationships SET
+      relationship_type = ${hasRelType ? (body.relationshipType || null) : existing.relationship_type},
+      strength = COALESCE(${hasStrength ? body.strength : null}, strength),
+      how_met = ${hasHowMet ? (body.howMet || null) : existing.how_met},
+      verified = COALESCE(${hasVerified ? body.verified : null}, verified),
+      updated_at = ${now}
+    WHERE id = ${id}
+  `
 
-  const relationship = db.query('SELECT * FROM relationships WHERE id = ?').get(id) as Relationship
+  const [relationship] = await sql<Relationship[]>`SELECT * FROM relationships WHERE id = ${id}`
 
   return c.json({ data: relationship })
 })
 
 // Delete relationship
-relationships.delete('/:id', (c) => {
-  const db = getDb()
+relationships.delete('/:id', async (c) => {
   const userId = c.get('user').userId
   const { id } = c.req.param()
 
-  const existing = db.query(
-    'SELECT * FROM relationships WHERE id = ? AND user_id = ?'
-  ).get(id, userId) as Relationship | null
+  const [existing] = await sql<Relationship[]>`
+    SELECT * FROM relationships WHERE id = ${id} AND user_id = ${userId}
+  `
 
   if (!existing) {
     return c.json({ error: 'Relationship not found' }, 404)
   }
 
-  db.query('DELETE FROM relationships WHERE id = ?').run(id)
+  await sql`DELETE FROM relationships WHERE id = ${id}`
 
   return c.json({ message: 'Relationship deleted successfully' })
 })
 
 // Verify AI-inferred relationship
 relationships.post('/:id/verify', async (c) => {
-  const db = getDb()
   const userId = c.get('user').userId
   const { id } = c.req.param()
   const body = await c.req.json<{ verified: boolean }>()
 
-  const existing = db.query(
-    'SELECT * FROM relationships WHERE id = ? AND user_id = ?'
-  ).get(id, userId) as Relationship | null
+  const [existing] = await sql<Relationship[]>`
+    SELECT * FROM relationships WHERE id = ${id} AND user_id = ${userId}
+  `
 
   if (!existing) {
     return c.json({ error: 'Relationship not found' }, 404)
   }
 
-  db.query(`
-    UPDATE relationships SET verified = ?, updated_at = ? WHERE id = ?
-  `).run(body.verified ? 1 : 0, new Date().toISOString(), id)
+  const now = new Date().toISOString()
+  await sql`
+    UPDATE relationships SET verified = ${body.verified}, updated_at = ${now} WHERE id = ${id}
+  `
 
-  const relationship = db.query('SELECT * FROM relationships WHERE id = ?').get(id) as Relationship
+  const [relationship] = await sql<Relationship[]>`SELECT * FROM relationships WHERE id = ${id}`
 
   return c.json({ data: relationship })
 })

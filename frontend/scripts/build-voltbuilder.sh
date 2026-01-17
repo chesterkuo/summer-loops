@@ -19,6 +19,12 @@ CURRENT_BUILD=$(grep -o '"build": "[0-9]*"' voltbuilder.json | grep -o '[0-9]*')
 NEW_BUILD=$((CURRENT_BUILD + 1))
 sed -i "s/\"build\": \"$CURRENT_BUILD\"/\"build\": \"$NEW_BUILD\"/" voltbuilder.json
 sed -i "s/\"buildNumber\": \"$CURRENT_BUILD\"/\"buildNumber\": \"$NEW_BUILD\"/" voltbuilder.json
+# Also update ios-CFBundleVersion in config.xml (handles multi-line format)
+sed -i "s/ios-CFBundleVersion=\"[0-9]*\"/ios-CFBundleVersion=\"$NEW_BUILD\"/" config.xml
+# Update CURRENT_PROJECT_VERSION in Xcode project
+if [ -f "ios/App/App.xcodeproj/project.pbxproj" ]; then
+    sed -i "s/CURRENT_PROJECT_VERSION = [0-9]*;/CURRENT_PROJECT_VERSION = $NEW_BUILD;/g" ios/App/App.xcodeproj/project.pbxproj
+fi
 echo "  Build number: $CURRENT_BUILD -> $NEW_BUILD"
 
 # Step 1: Check for required files
