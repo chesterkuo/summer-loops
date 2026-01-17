@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <widget id="com.mywarmly.app"
         version="1.0.0"
-        ios-CFBundleVersion="51"
+        ios-CFBundleVersion="52"
         xmlns="http://www.w3.org/ns/widgets"
         xmlns:cdv="http://cordova.apache.org/ns/1.0">
     <name>Warmly</name>
@@ -22,6 +22,20 @@
     <!-- iOS Platform Preferences -->
     <platform name="ios">
         <preference name="deployment-target" value="13.0" />
+
+        <!-- iOS Permissions -->
+        <config-file target="*-Info.plist" parent="NSCameraUsageDescription">
+            <string>Warmly needs camera access to scan business cards and QR codes</string>
+        </config-file>
+        <config-file target="*-Info.plist" parent="NSMicrophoneUsageDescription">
+            <string>Warmly needs microphone access for voice memos and speech-to-text</string>
+        </config-file>
+        <config-file target="*-Info.plist" parent="NSSpeechRecognitionUsageDescription">
+            <string>Warmly uses speech recognition to transcribe your voice memos</string>
+        </config-file>
+        <config-file target="*-Info.plist" parent="NSPhotoLibraryUsageDescription">
+            <string>Warmly needs photo library access to select business card images</string>
+        </config-file>
         <preference name="WKWebViewOnly" value="true" />
         <preference name="CordovaWebViewEngine" value="CDVWKWebViewEngine" />
         <preference name="SwiftVersion" value="5" />

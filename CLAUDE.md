@@ -108,6 +108,19 @@ The build script (`./scripts/build-voltbuilder.sh`) auto-increments the build nu
 ### Icon Sizes Generated
 40, 58, 60, 76, 80, 87, 120, 152, 167, 180, 512, 1024 pixels
 
+### iOS Permissions
+
+Required permissions in `frontend/ios/App/App/Info.plist`:
+
+| Permission Key | Usage |
+|----------------|-------|
+| `NSCameraUsageDescription` | Business card & QR code scanning |
+| `NSMicrophoneUsageDescription` | Voice memos & speech-to-text |
+| `NSSpeechRecognitionUsageDescription` | Speech recognition transcription |
+| `NSPhotoLibraryUsageDescription` | Select images from photo library |
+
+**Note:** Even though the app uses Web APIs (getUserMedia, SpeechRecognition), iOS still requires these Info.plist declarations. Without them, permissions are silently denied.
+
 ### Troubleshooting
 
 **Build fails with certificate error:**
@@ -127,6 +140,11 @@ The build script (`./scripts/build-voltbuilder.sh`) auto-increments the build nu
 - Ensure all three build number locations are in sync (see "Build Number" section)
 - The Xcode project's `CURRENT_PROJECT_VERSION` in `project.pbxproj` is the actual value used
 - Run `./scripts/build-voltbuilder.sh` which auto-increments all locations
+
+**Camera/Microphone permission denied on iOS:**
+- Ensure Info.plist contains the required `NS*UsageDescription` keys (see "iOS Permissions" section)
+- These are required even when using Web APIs like getUserMedia and SpeechRecognition
+- Rebuild the app after adding permissions - existing installs need to be deleted first
 
 ---
 

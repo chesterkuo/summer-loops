@@ -58,3 +58,6 @@ coverage/
 .cache/
 *.bak
 .playwright-mcp/
+
+# VoltBuilder packages
+*-voltbuilder-*.zip

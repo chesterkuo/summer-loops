@@ -45,5 +45,13 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Warmly needs camera access to scan business cards and QR codes</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Warmly needs microphone access for voice memos and speech-to-text</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Warmly uses speech recognition to transcribe your voice memos</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Warmly needs photo library access to select business card images</string>
 </dict>
 </plist>
