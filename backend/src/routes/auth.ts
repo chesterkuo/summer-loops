@@ -12,10 +12,163 @@ const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET
 const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3000/api/auth/google/callback'
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173'
 
+// Demo account credentials
+const DEMO_EMAIL = 'demo@warmly.app'
+const DEMO_PASSWORD = 'demo123'
+const DEMO_USER_ID = 'demo-user-001'
+
 // Check if Google OAuth is configured
 function isOAuthConfigured(): boolean {
   return !!(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET)
 }
+
+// Password validation
+function validatePassword(password: string): { valid: boolean; error?: string } {
+  if (!password || password.length < 6) {
+    return { valid: false, error: 'Password must be at least 6 characters' }
+  }
+  return { valid: true }
+}
+
+// Email validation
+function validateEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(email)
+}
+
+// ==================== Email/Password Auth ====================
+
+// Signup with email/password
+auth.post('/signup', async (c) => {
+  const body = await c.req.json() as { email?: string; password?: string; name?: string }
+
+  // Validate input
+  if (!body.email || !body.password || !body.name) {
+    return c.json({ error: 'Email, password, and name are required' }, 400)
+  }
+
+  if (!validateEmail(body.email)) {
+    return c.json({ error: 'Invalid email format' }, 400)
+  }
+
+  const passwordValidation = validatePassword(body.password)
+  if (!passwordValidation.valid) {
+    return c.json({ error: passwordValidation.error }, 400)
+  }
+
+  if (body.name.trim().length < 1 || body.name.length > 100) {
+    return c.json({ error: 'Name must be between 1 and 100 characters' }, 400)
+  }
+
+  const db = getDb()
+
+  // Check if email already exists
+  const existingUser = db.query('SELECT id FROM users WHERE email = ?').get(body.email.toLowerCase())
+  if (existingUser) {
+    return c.json({ error: 'Email already registered' }, 409)
+  }
+
+  try {
+    // Hash password using Bun's built-in bcrypt
+    const passwordHash = await Bun.password.hash(body.password, {
+      algorithm: 'bcrypt',
+      cost: 12
+    })
+
+    const userId = generateId()
+    const now = new Date().toISOString()
+    const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(body.name)}&background=39E079&color=fff`
+
+    db.query(`
+      INSERT INTO users (id, email, name, avatar_url, password_hash, auth_provider, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 'email', ?, ?)
+    `).run(userId, body.email.toLowerCase(), body.name.trim(), avatarUrl, passwordHash, now, now)
+
+    const user = db.query('SELECT * FROM users WHERE id = ?').get(userId) as User
+
+    // Generate JWT token
+    const token = await generateToken({
+      userId: user.id,
+      email: user.email,
+      name: user.name
+    })
+
+    return c.json({
+      data: {
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          avatarUrl: (user as any).avatar_url
+        },
+        expiresIn: getExpirationMs()
+      }
+    }, 201)
+  } catch (error) {
+    console.error('Signup error:', error)
+    return c.json({ error: 'Failed to create account' }, 500)
+  }
+})
+
+// Login with email/password
+auth.post('/login', async (c) => {
+  const body = await c.req.json() as { email?: string; password?: string }
+
+  if (!body.email || !body.password) {
+    return c.json({ error: 'Email and password are required' }, 400)
+  }
+
+  const db = getDb()
+
+  // Find user by email
+  const user = db.query('SELECT * FROM users WHERE email = ?').get(body.email.toLowerCase()) as User | null
+
+  if (!user) {
+    return c.json({ error: 'Invalid email or password' }, 401)
+  }
+
+  // Check if user has password (might be Google OAuth only)
+  const passwordHash = (user as any).password_hash
+  if (!passwordHash) {
+    const authProvider = (user as any).auth_provider
+    if (authProvider === 'google') {
+      return c.json({ error: 'This account uses Google login. Please sign in with Google.' }, 401)
+    }
+    return c.json({ error: 'Invalid email or password' }, 401)
+  }
+
+  try {
+    // Verify password
+    const isValid = await Bun.password.verify(body.password, passwordHash)
+    if (!isValid) {
+      return c.json({ error: 'Invalid email or password' }, 401)
+    }
+
+    // Generate JWT token
+    const token = await generateToken({
+      userId: user.id,
+      email: user.email,
+      name: user.name
+    })
+
+    return c.json({
+      data: {
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          avatarUrl: (user as any).avatar_url
+        },
+        expiresIn: getExpirationMs()
+      }
+    })
+  } catch (error) {
+    console.error('Login error:', error)
+    return c.json({ error: 'Login failed' }, 500)
+  }
+})
 
 // Redirect to Google OAuth
 auth.get('/google', (c) => {
@@ -242,39 +395,96 @@ auth.post('/logout', (c) => {
   return c.json({ message: 'Logged out successfully' })
 })
 
+// Delete account
+auth.delete('/account', authMiddleware, async (c) => {
+  const user = c.get('user')
+  const db = getDb()
+
+  // Don't allow deleting demo account
+  if (user.userId === DEMO_USER_ID) {
+    return c.json({ error: 'Cannot delete demo account' }, 403)
+  }
+
+  try {
+    // Delete in order to respect foreign key constraints
+    // The schema has ON DELETE CASCADE, so deleting user will cascade to:
+    // - contacts (which cascades to career_history, education_history, contact_tags, interactions)
+    // - relationships
+    // - introduction_requests
+    // - tags
+    // - teams (owned)
+    // - team_members
+    // - notifications
+
+    // Delete the user (cascades to all related data)
+    db.query('DELETE FROM users WHERE id = ?').run(user.userId)
+
+    return c.json({
+      data: {
+        message: 'Account deleted successfully'
+      }
+    })
+  } catch (error) {
+    console.error('Delete account error:', error)
+    return c.json({ error: 'Failed to delete account' }, 500)
+  }
+})
+
 // Check OAuth configuration status
 auth.get('/status', (c) => {
   return c.json({
     data: {
       googleOAuthConfigured: isOAuthConfigured(),
-      demoMode: !isOAuthConfigured()
+      emailPasswordEnabled: true,
+      demoAccount: {
+        email: DEMO_EMAIL,
+        password: DEMO_PASSWORD
+      }
     }
   })
 })
 
-// Demo login (for development without OAuth)
+// Initialize demo account with sample data
 auth.post('/demo', async (c) => {
   const db = getDb()
-  const DEMO_USER_ID = 'demo-user-001'
 
   // Get or create demo user
   let user = db.query('SELECT * FROM users WHERE id = ?').get(DEMO_USER_ID) as User | null
 
   if (!user) {
     const now = new Date().toISOString()
+    const passwordHash = await Bun.password.hash(DEMO_PASSWORD, {
+      algorithm: 'bcrypt',
+      cost: 12
+    })
+
     db.query(`
-      INSERT INTO users (id, email, name, avatar_url, google_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (id, email, name, avatar_url, password_hash, auth_provider, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 'demo', ?, ?)
     `).run(
       DEMO_USER_ID,
-      'demo@summerloop.app',
-      'Demo User',
-      'https://ui-avatars.com/api/?name=Demo+User&background=39E079&color=fff',
-      'google-demo-001',
+      DEMO_EMAIL,
+      'Chester',
+      'https://ui-avatars.com/api/?name=Chester&background=39E079&color=fff',
+      passwordHash,
       now,
       now
     )
     user = db.query('SELECT * FROM users WHERE id = ?').get(DEMO_USER_ID) as User
+
+    // Initialize sample data for demo user
+    await initializeDemoData(db, DEMO_USER_ID)
+  } else {
+    // Update password hash if demo user exists but might not have password
+    const existingHash = (user as any).password_hash
+    if (!existingHash) {
+      const passwordHash = await Bun.password.hash(DEMO_PASSWORD, {
+        algorithm: 'bcrypt',
+        cost: 12
+      })
+      db.query('UPDATE users SET password_hash = ?, auth_provider = ? WHERE id = ?')
+        .run(passwordHash, 'demo', DEMO_USER_ID)
+    }
   }
 
   const token = await generateToken({
@@ -296,5 +506,76 @@ auth.post('/demo', async (c) => {
     }
   })
 })
+
+// Initialize demo data with sample contacts and relationships
+async function initializeDemoData(db: any, userId: string): Promise<void> {
+  const now = new Date().toISOString()
+
+  // Sample contacts
+  const sampleContacts = [
+    { id: 'contact-demo-001', name: 'Lisa Wong', company: 'Meta', title: 'Staff Frontend Engineer', email: 'lisa.wong@meta.com' },
+    { id: 'contact-demo-003', name: 'Michael Chen', company: 'Google', title: 'Senior Product Manager', email: 'michael.chen@google.com' },
+    { id: 'contact-demo-004', name: 'Sarah Kim', company: 'Apple', title: 'UX Designer', email: 'sarah.kim@apple.com' },
+    { id: 'contact-demo-005', name: 'David Lee', company: 'Amazon', title: 'Software Engineer', email: 'david.lee@amazon.com' },
+    { id: 'contact-demo-006', name: 'Emily Zhang', company: 'Netflix', title: 'Data Scientist', email: 'emily.zhang@netflix.com' },
+    { id: 'contact-demo-007', name: 'Jason Park', company: 'Uber', title: 'Engineering Manager', email: 'jason.park@uber.com' },
+    { id: 'contact-demo-008', name: 'Jennifer Wu', company: 'Airbnb', title: 'Marketing Director', email: 'jennifer.wu@airbnb.com' },
+  ]
+
+  for (const contact of sampleContacts) {
+    const existing = db.query('SELECT id FROM contacts WHERE id = ?').get(contact.id)
+    if (!existing) {
+      const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}&background=random&color=fff`
+      db.query(`
+        INSERT INTO contacts (id, user_id, name, company, title, email, source, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, 'manual', ?, ?)
+      `).run(contact.id, userId, contact.name, contact.company, contact.title, contact.email, now, now)
+    }
+  }
+
+  // Sample relationships (user to contacts)
+  const sampleRelationships = [
+    { contactId: 'contact-demo-001', strength: 5, type: 'colleague', howMet: 'Former team at startup' },
+    { contactId: 'contact-demo-003', strength: 3, type: 'professional', howMet: 'Tech conference 2024' },
+    { contactId: 'contact-demo-004', strength: 4, type: 'colleague', howMet: 'Previous company' },
+    { contactId: 'contact-demo-005', strength: 2, type: 'acquaintance', howMet: 'LinkedIn connection' },
+    { contactId: 'contact-demo-006', strength: 3, type: 'professional', howMet: 'Meetup group' },
+    { contactId: 'contact-demo-007', strength: 4, type: 'friend', howMet: 'Hackathon partner' },
+    { contactId: 'contact-demo-008', strength: 3, type: 'professional', howMet: 'Introduced by Lisa' },
+  ]
+
+  for (const rel of sampleRelationships) {
+    const relId = `rel-demo-${rel.contactId}`
+    const existing = db.query('SELECT id FROM relationships WHERE id = ?').get(relId)
+    if (!existing) {
+      db.query(`
+        INSERT INTO relationships (id, user_id, contact_a_id, is_user_relationship, relationship_type, strength, how_met, created_at, updated_at)
+        VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)
+      `).run(relId, userId, rel.contactId, rel.type, rel.strength, rel.howMet, now, now)
+    }
+  }
+
+  // Some contact-to-contact relationships for network graph
+  const contactRelationships = [
+    { from: 'contact-demo-001', to: 'contact-demo-003', strength: 4, type: 'colleague' },
+    { from: 'contact-demo-001', to: 'contact-demo-008', strength: 3, type: 'friend' },
+    { from: 'contact-demo-003', to: 'contact-demo-005', strength: 4, type: 'colleague' },
+    { from: 'contact-demo-004', to: 'contact-demo-006', strength: 2, type: 'professional' },
+    { from: 'contact-demo-005', to: 'contact-demo-007', strength: 3, type: 'colleague' },
+  ]
+
+  for (const rel of contactRelationships) {
+    const relId = `rel-demo-${rel.from}-${rel.to}`
+    const existing = db.query('SELECT id FROM relationships WHERE id = ?').get(relId)
+    if (!existing) {
+      db.query(`
+        INSERT INTO relationships (id, user_id, contact_a_id, contact_b_id, is_user_relationship, relationship_type, strength, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)
+      `).run(relId, userId, rel.from, rel.to, rel.type, rel.strength, now, now)
+    }
+  }
+
+  console.log('Demo data initialized for user:', userId)
+}
 
 export default auth

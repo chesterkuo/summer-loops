@@ -154,6 +154,28 @@ export const authApi = {
     return apiFetch<{ googleOAuthConfigured: boolean; demoMode: boolean }>('/auth/status')
   },
 
+  async signup(data: { email: string; password: string; name: string }) {
+    const result = await apiFetch<{ token: string; user: User; expiresIn: number }>('/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+    if (result.data?.token) {
+      setAuthToken(result.data.token)
+    }
+    return result
+  },
+
+  async login(data: { email: string; password: string }) {
+    const result = await apiFetch<{ token: string; user: User; expiresIn: number }>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+    if (result.data?.token) {
+      setAuthToken(result.data.token)
+    }
+    return result
+  },
+
   async demoLogin() {
     const result = await apiFetch<{ token: string; user: User; expiresIn: number }>('/auth/demo', {
       method: 'POST',
@@ -178,6 +200,16 @@ export const authApi = {
   async logout() {
     setAuthToken(null)
     return apiFetch('/auth/logout', { method: 'POST' })
+  },
+
+  async deleteAccount() {
+    const result = await apiFetch<{ message: string }>('/auth/account', {
+      method: 'DELETE',
+    })
+    if (result.data) {
+      setAuthToken(null)
+    }
+    return result
   },
 }
 
@@ -661,5 +693,23 @@ export const teamsApi = {
 
   async getContacts(teamId: string) {
     return apiFetch<SharedContact[]>(`/teams/${teamId}/contacts`)
+  },
+
+  async shareAllContacts(teamId: string, data: { visibility?: 'basic' | 'full' }) {
+    return apiFetch<{ sharedCount: number }>(`/teams/${teamId}/share-all`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  async getAutoShare(teamId: string) {
+    return apiFetch<{ autoShare: boolean; visibility: string }>(`/teams/${teamId}/auto-share`)
+  },
+
+  async updateAutoShare(teamId: string, data: { autoShare: boolean; visibility?: 'basic' | 'full' }) {
+    return apiFetch<{ autoShare: boolean; visibility: string }>(`/teams/${teamId}/auto-share`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
   },
 }

@@ -46,7 +46,7 @@ paths.post('/search', async (c) => {
       }
     })
   } else {
-    // Search by description
+    // Search by description (includes cross-team search)
     const result = searchPaths(userId, body.targetDescription!, maxHops, topK)
 
     if (!result.targetContact) {
@@ -61,7 +61,8 @@ paths.post('/search', async (c) => {
     return c.json({
       data: {
         paths: result.paths,
-        targetContact: result.targetContact
+        targetContact: result.targetContact,
+        isTeamContact: result.isTeamContact
       }
     })
   }

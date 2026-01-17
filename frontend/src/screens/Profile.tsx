@@ -7,7 +7,7 @@ import { useContactStore } from '../stores/contactStore';
 import { useLocaleStore } from '../stores/localeStore';
 import { useNotificationStore } from '../stores/notificationStore';
 import { useAuthStore } from '../stores/authStore';
-import { relationshipsApi, interactionsApi, aiApi, Relationship, Interaction } from '../services/api';
+import { relationshipsApi, interactionsApi, aiApi, Relationship, Interaction, Contact } from '../services/api';
 
 interface ProfileProps {
   onNavigate: (screen: ScreenName) => void;
@@ -16,9 +16,9 @@ interface ProfileProps {
 const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
   const { t } = useTranslation();
   const { currentLocale, setLocale, supportedLanguages } = useLocaleStore();
-  const { selectedContact, isLoading, setSelectedContact } = useContactStore();
+  const { selectedContact, isLoading, setSelectedContact, updateContact } = useContactStore();
   const { openCreateModal } = useNotificationStore();
-  const { user, logout, updateUser } = useAuthStore();
+  const { user, logout, updateUser, deleteAccount } = useAuthStore();
   const [userRelationship, setUserRelationship] = useState<Relationship | null>(null);
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [isLoadingInteractions, setIsLoadingInteractions] = useState(false);
@@ -32,6 +32,15 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [editingBio, setEditingBio] = useState('');
   const [isSavingBio, setIsSavingBio] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
+  // Edit contact state
+  const [showEditContactModal, setShowEditContactModal] = useState(false);
+  const [isSavingContact, setIsSavingContact] = useState(false);
+  const [editingContact, setEditingContact] = useState<Partial<Contact>>({});
+  const [isEditingInsight, setIsEditingInsight] = useState(false);
+  const [editingInsight, setEditingInsight] = useState('');
 
   // Fetch relationship and interactions data for this contact
   useEffect(() => {
@@ -83,6 +92,81 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
   const [newInteraction, setNewInteraction] = useState({ title: t('interaction.meeting'), note: '', type: 'meeting' });
   const [showMenu, setShowMenu] = useState(false);
+
+  // Open edit contact modal
+  const openEditContactModal = () => {
+    if (selectedContact) {
+      setEditingContact({
+        name: selectedContact.name || '',
+        company: selectedContact.company || '',
+        title: selectedContact.title || '',
+        department: selectedContact.department || '',
+        email: selectedContact.email || '',
+        phone: selectedContact.phone || '',
+        notes: selectedContact.notes || '',
+        line_id: selectedContact.line_id || '',
+        telegram_username: selectedContact.telegram_username || '',
+        whatsapp_number: selectedContact.whatsapp_number || '',
+        wechat_id: selectedContact.wechat_id || '',
+        twitter_handle: selectedContact.twitter_handle || '',
+        instagram_handle: selectedContact.instagram_handle || '',
+        linkedin_url: selectedContact.linkedin_url || '',
+      });
+      setShowEditContactModal(true);
+    }
+  };
+
+  // Save edited contact
+  const handleSaveContact = async () => {
+    if (!selectedContact?.id || !editingContact.name?.trim()) return;
+
+    setIsSavingContact(true);
+    const success = await updateContact(selectedContact.id, {
+      name: editingContact.name?.trim(),
+      company: editingContact.company?.trim() || null,
+      title: editingContact.title?.trim() || null,
+      department: editingContact.department?.trim() || null,
+      email: editingContact.email?.trim() || null,
+      phone: editingContact.phone?.trim() || null,
+      notes: editingContact.notes?.trim() || null,
+      line_id: editingContact.line_id?.trim() || null,
+      telegram_username: editingContact.telegram_username?.trim() || null,
+      whatsapp_number: editingContact.whatsapp_number?.trim() || null,
+      wechat_id: editingContact.wechat_id?.trim() || null,
+      twitter_handle: editingContact.twitter_handle?.trim() || null,
+      instagram_handle: editingContact.instagram_handle?.trim() || null,
+      linkedin_url: editingContact.linkedin_url?.trim() || null,
+    });
+
+    if (success) {
+      // Update selectedContact with new data
+      setSelectedContact({
+        ...selectedContact,
+        ...editingContact,
+      });
+      setShowEditContactModal(false);
+    }
+    setIsSavingContact(false);
+  };
+
+  // Save edited insight/notes
+  const handleSaveInsight = async () => {
+    if (!selectedContact?.id) return;
+
+    setIsSavingContact(true);
+    const success = await updateContact(selectedContact.id, {
+      notes: editingInsight.trim() || null,
+    });
+
+    if (success) {
+      setSelectedContact({
+        ...selectedContact,
+        notes: editingInsight.trim() || null,
+      });
+      setIsEditingInsight(false);
+    }
+    setIsSavingContact(false);
+  };
 
   const handleAddInteraction = async () => {
     if (!newInteraction.type || !selectedContact?.id) return;
@@ -290,6 +374,235 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
                   </>
                 ) : (
                   t('common.save')
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Account Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-[#2C3435] w-full max-w-sm rounded-2xl p-6 border border-white/10 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-red-500/20 rounded-full">
+                <span className="material-symbols-outlined text-red-400 text-[24px]">warning</span>
+              </div>
+              <h3 className="text-lg font-bold text-white">{t('profile.deleteAccount')}</h3>
+            </div>
+            <p className="text-gray-300 text-sm mb-6">
+              {t('profile.deleteAccountWarning')}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isDeletingAccount}
+                className="flex-1 py-3 rounded-xl bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold transition-colors disabled:opacity-50"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={async () => {
+                  setIsDeletingAccount(true);
+                  const success = await deleteAccount();
+                  setIsDeletingAccount(false);
+                  if (success) {
+                    setShowDeleteModal(false);
+                    onNavigate('dashboard');
+                  }
+                }}
+                disabled={isDeletingAccount}
+                className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isDeletingAccount ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    {t('profile.deleting')}
+                  </>
+                ) : (
+                  t('profile.confirmDelete')
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Contact Modal */}
+      {showEditContactModal && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-[#2C3435] w-full max-w-md rounded-2xl p-5 border border-white/10 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary">edit</span>
+                {t('profile.editContact')}
+              </h3>
+              <button onClick={() => setShowEditContactModal(false)} className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-white/10">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Basic Info */}
+              <div>
+                <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">{t('scanCard.name')} *</label>
+                <input
+                  value={editingContact.name || ''}
+                  onChange={(e) => setEditingContact({ ...editingContact, name: e.target.value })}
+                  className="w-full bg-black/20 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-primary outline-none transition-colors"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">{t('scanCard.company')}</label>
+                  <input
+                    value={editingContact.company || ''}
+                    onChange={(e) => setEditingContact({ ...editingContact, company: e.target.value })}
+                    className="w-full bg-black/20 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-primary outline-none transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">{t('scanCard.jobTitle')}</label>
+                  <input
+                    value={editingContact.title || ''}
+                    onChange={(e) => setEditingContact({ ...editingContact, title: e.target.value })}
+                    className="w-full bg-black/20 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-primary outline-none transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">{t('scanCard.department')}</label>
+                <input
+                  value={editingContact.department || ''}
+                  onChange={(e) => setEditingContact({ ...editingContact, department: e.target.value })}
+                  placeholder={t('scanCard.departmentPlaceholder')}
+                  className="w-full bg-black/20 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-primary outline-none transition-colors"
+                />
+              </div>
+
+              {/* Contact Info */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">{t('scanCard.email')}</label>
+                  <input
+                    type="email"
+                    value={editingContact.email || ''}
+                    onChange={(e) => setEditingContact({ ...editingContact, email: e.target.value })}
+                    className="w-full bg-black/20 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-primary outline-none transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">{t('scanCard.phone')}</label>
+                  <input
+                    type="tel"
+                    value={editingContact.phone || ''}
+                    onChange={(e) => setEditingContact({ ...editingContact, phone: e.target.value })}
+                    className="w-full bg-black/20 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-primary outline-none transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Social Links */}
+              <div className="pt-2 border-t border-white/10">
+                <h4 className="text-xs font-bold text-gray-400 mb-3">{t('scanCard.socialLinks')}</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">LINE ID</label>
+                    <input
+                      value={editingContact.line_id || ''}
+                      onChange={(e) => setEditingContact({ ...editingContact, line_id: e.target.value })}
+                      className="w-full bg-black/20 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-primary outline-none transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">WeChat</label>
+                    <input
+                      value={editingContact.wechat_id || ''}
+                      onChange={(e) => setEditingContact({ ...editingContact, wechat_id: e.target.value })}
+                      className="w-full bg-black/20 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-primary outline-none transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">Telegram</label>
+                    <input
+                      value={editingContact.telegram_username || ''}
+                      onChange={(e) => setEditingContact({ ...editingContact, telegram_username: e.target.value })}
+                      className="w-full bg-black/20 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-primary outline-none transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">WhatsApp</label>
+                    <input
+                      value={editingContact.whatsapp_number || ''}
+                      onChange={(e) => setEditingContact({ ...editingContact, whatsapp_number: e.target.value })}
+                      className="w-full bg-black/20 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-primary outline-none transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">X/Twitter</label>
+                    <input
+                      value={editingContact.twitter_handle || ''}
+                      onChange={(e) => setEditingContact({ ...editingContact, twitter_handle: e.target.value })}
+                      className="w-full bg-black/20 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-primary outline-none transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">Instagram</label>
+                    <input
+                      value={editingContact.instagram_handle || ''}
+                      onChange={(e) => setEditingContact({ ...editingContact, instagram_handle: e.target.value })}
+                      className="w-full bg-black/20 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-primary outline-none transition-colors"
+                    />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">LinkedIn URL</label>
+                  <input
+                    value={editingContact.linkedin_url || ''}
+                    onChange={(e) => setEditingContact({ ...editingContact, linkedin_url: e.target.value })}
+                    placeholder="https://linkedin.com/in/..."
+                    className="w-full bg-black/20 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-primary outline-none transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">{t('interaction.notes')}</label>
+                <textarea
+                  value={editingContact.notes || ''}
+                  onChange={(e) => setEditingContact({ ...editingContact, notes: e.target.value })}
+                  placeholder={t('profile.notesPlaceholder')}
+                  className="w-full bg-black/20 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-primary outline-none transition-colors h-20 resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => setShowEditContactModal(false)}
+                className="flex-1 py-3 rounded-xl bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold transition-colors"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={handleSaveContact}
+                disabled={isSavingContact || !editingContact.name?.trim()}
+                className="flex-1 py-3 rounded-xl bg-primary hover:bg-primary-dark text-black text-sm font-bold transition-colors shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isSavingContact ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black"></div>
+                    {t('common.loading')}
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[18px]">save</span>
+                    {t('common.save')}
+                  </>
                 )}
               </button>
             </div>
@@ -541,23 +854,6 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
               </p>
             </div>
 
-            {/* Language Settings */}
-            <div className="bg-surface-card p-5 rounded-2xl shadow-sm border border-white/5">
-              <h3 className="font-bold text-xs text-gray-400 uppercase tracking-widest mb-4">{t('menu.language')}</h3>
-              <div className="grid grid-cols-3 gap-2">
-                {supportedLanguages.map((lang) => (
-                  <button
-                    key={lang.code}
-                    onClick={() => setLocale(lang.code)}
-                    className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all active:scale-95 ${currentLocale === lang.code ? 'bg-primary/20 border-primary text-white shadow-sm' : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10 hover:text-gray-200'}`}
-                  >
-                    <span className="text-xl mb-1">{lang.flag}</span>
-                    <span className="text-[10px] font-bold">{lang.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* Account Actions */}
             <div className="bg-surface-card p-5 rounded-2xl shadow-sm border border-white/5">
               <h3 className="font-bold text-xs text-gray-400 uppercase tracking-widest mb-4">{t('profile.account')}</h3>
@@ -581,10 +877,17 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
                     logout();
                     onNavigate('dashboard');
                   }}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-left"
+                >
+                  <span className="material-symbols-outlined text-orange-400">logout</span>
+                  <span className="text-sm font-medium text-white">{t('common.exit')}</span>
+                </button>
+                <button
+                  onClick={() => setShowDeleteModal(true)}
                   className="w-full flex items-center gap-3 p-3 rounded-xl bg-red-900/20 hover:bg-red-900/30 transition-colors text-left border border-red-800/30"
                 >
-                  <span className="material-symbols-outlined text-red-400">logout</span>
-                  <span className="text-sm font-medium text-red-400">{t('common.exit')}</span>
+                  <span className="material-symbols-outlined text-red-400">delete_forever</span>
+                  <span className="text-sm font-medium text-red-400">{t('profile.deleteAccount')}</span>
                 </button>
               </div>
             </div>
@@ -610,7 +913,16 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
             )}
           </div>
           <div className="flex flex-col items-center text-center gap-1">
-            <h1 className="text-white text-2xl font-extrabold tracking-tight">{selectedContact.name}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-white text-2xl font-extrabold tracking-tight">{selectedContact.name}</h1>
+              <button
+                onClick={openEditContactModal}
+                className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                title={t('profile.editContact')}
+              >
+                <span className="material-symbols-outlined text-[18px]">edit</span>
+              </button>
+            </div>
             <p className="text-text-muted text-sm font-medium">
               {selectedContact.title ? `${selectedContact.title}` : ''}
               {selectedContact.title && selectedContact.company ? ' at ' : ''}
@@ -786,11 +1098,57 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
                   <div className="h-3 bg-white/10 rounded w-3/5"></div>
                 </div>
               </div>
+            ) : isEditingInsight ? (
+              <div className="space-y-3">
+                <textarea
+                  value={editingInsight}
+                  onChange={(e) => setEditingInsight(e.target.value)}
+                  placeholder={t('profile.insightPlaceholder')}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm placeholder:text-gray-500 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/30 resize-none"
+                  rows={4}
+                  autoFocus
+                />
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => {
+                      setIsEditingInsight(false);
+                      setEditingInsight('');
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-gray-700 text-white text-sm hover:bg-gray-600"
+                  >
+                    {t('common.cancel')}
+                  </button>
+                  <button
+                    onClick={handleSaveInsight}
+                    disabled={isSavingContact}
+                    className="px-3 py-1.5 rounded-lg bg-primary text-black text-sm font-medium hover:bg-primary-dark disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {isSavingContact ? (
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-black"></div>
+                    ) : (
+                      <span className="material-symbols-outlined text-[16px]">check</span>
+                    )}
+                    {t('common.save')}
+                  </button>
+                </div>
+              </div>
             ) : (
-              <div>
-                <p className={`text-gray-300 text-[15px] leading-relaxed ${!isInsightExpanded ? 'line-clamp-4' : ''}`}>
-                  {aiSummary || selectedContact.notes || t('profile.defaultInsight', { name: selectedContact.name })}
-                </p>
+              <div className="group/insight">
+                <div className="flex items-start gap-2">
+                  <p className={`flex-1 text-gray-300 text-[15px] leading-relaxed ${!isInsightExpanded ? 'line-clamp-4' : ''}`}>
+                    {aiSummary || selectedContact.notes || t('profile.defaultInsight', { name: selectedContact.name })}
+                  </p>
+                  <button
+                    onClick={() => {
+                      setEditingInsight(selectedContact.notes || '');
+                      setIsEditingInsight(true);
+                    }}
+                    className="p-1.5 rounded-lg hover:bg-white/10 text-gray-500 hover:text-white transition-colors opacity-0 group-hover/insight:opacity-100"
+                    title={t('common.edit')}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">edit</span>
+                  </button>
+                </div>
                 {(aiSummary || selectedContact.notes || '').length > 200 && (
                   <button
                     onClick={() => setIsInsightExpanded(!isInsightExpanded)}

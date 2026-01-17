@@ -87,7 +87,14 @@
     "myGoal": "我的目标",
     "addBio": "添加你的目标或目的",
     "bioPlaceholder": "例如：寻找资深工程师职位，或为我的创业项目寻找投资人...",
-    "bioHint": "这将会包含在 AI 生成的介绍请求中，帮助你的人脉了解你正在寻找什么。"
+    "bioHint": "这将会包含在 AI 生成的介绍请求中，帮助你的人脉了解你正在寻找什么。",
+    "deleteAccount": "删除账户",
+    "deleteAccountWarning": "此操作无法撤销。您的所有数据，包括联系人、关系和账户信息，将被永久删除。",
+    "confirmDelete": "确认删除",
+    "deleting": "删除中...",
+    "editContact": "编辑联系人",
+    "notesPlaceholder": "添加关于此联系人的备注...",
+    "insightPlaceholder": "添加关于此联系人的个人笔记或洞察..."
   },
   "analysis": {
     "title": "关系分析",
@@ -174,6 +181,9 @@
     "bestRouteFound": "找到最佳路线",
     "introPath": "介绍路径",
     "connector": "连接者",
+    "teammate": "队友",
+    "teamContact": "团队联系人",
+    "via": "通过",
     "pathStrength": "路径强度分析",
     "highResponse": "高回复可能性",
     "mediumResponse": "中等回复可能性",
@@ -182,7 +192,6 @@
     "pathHops_plural": "此路径有 {{count}} 步，整体强度为 {{strength}}%。",
     "connectorHelp": "连接者 {{name}} 可协助搭起介绍的桥梁。",
     "alternativePaths": "替代路径",
-    "via": "通过 {{names}}",
     "strong": "强",
     "medium": "中",
     "weak": "弱",
@@ -287,16 +296,36 @@
   },
   "voiceMemo": {
     "title": "语音备忘录",
-    "startRecording": "开始录音",
+    "startRecording": "录音",
     "stopRecording": "停止录音",
+    "stop": "停止",
     "recording": "录音中",
     "processing": "处理中...",
     "tapToRecord": "点击开始录音",
+    "tapToStart": "点击麦克风开始录音",
     "speakNow": "请开始说话...",
     "transcription": "语音转文字",
     "saveAsNote": "保存为笔记",
     "processedLocally": "本机处理",
-    "liveTranscript": "实时转录"
+    "liveTranscript": "实时转录",
+    "transcriptPlaceholder": "开始录音，您的语音将会显示在这里...",
+    "readyToProcess": "准备处理",
+    "processWithAI": "AI 智能解析",
+    "process": "处理",
+    "resume": "继续",
+    "saveContact": "保存联系人",
+    "meetingNotes": "会议记录",
+    "editBeforeSave": "保存前编辑提取的信息：",
+    "noContactFound": "录音中未找到联系人信息。以下是您的转录内容：",
+    "nameRequired": "姓名为必填字段",
+    "parseFailed": "解析转录内容失败，请重试。",
+    "saveFailed": "保存联系人失败，请重试。",
+    "saveSuccess": "联系人保存成功！",
+    "notSupported": "不支持",
+    "notSupportedDesc": "此浏览器不支持语音识别。请使用 Chrome、Safari 或 Edge。",
+    "micPermissionDenied": "麦克风权限被拒绝。请允许麦克风访问以使用语音录音。",
+    "recognitionError": "语音识别错误，请重试。",
+    "startError": "启动录音失败，请重试。"
   },
   "company": {
     "title": "公司",
@@ -364,7 +393,32 @@
     "visibilityFull": "完整",
     "visibilityBasicDesc": "只分享姓名、公司和职称",
     "visibilityFullDesc": "分享所有联系信息，包括电子邮件和电话",
-    "share": "分享"
+    "share": "分享",
+    "shareAll": "全部分享",
+    "shareAllContacts": "分享所有联系人",
+    "shareAllDesc": "一次将你所有的联系人分享给这个团队。",
+    "shareAllWarning": "这将会分享 {{count}} 位联系人给团队。",
+    "autoShare": "自动分享",
+    "autoShareDesc": "自动将你新增的联系人分享给这个团队。"
+  },
+  "login": {
+    "tagline": "你的专业人脉，简单管理",
+    "signIn": "登录",
+    "signUp": "注册",
+    "name": "姓名",
+    "namePlaceholder": "输入你的姓名",
+    "email": "电子邮件",
+    "emailPlaceholder": "输入你的电子邮件",
+    "password": "密码",
+    "passwordPlaceholder": "输入你的密码",
+    "passwordHint": "至少 6 个字符",
+    "signInButton": "登录",
+    "signUpButton": "创建账户",
+    "or": "或",
+    "tryDemo": "试用演示账户",
+    "demoHint": "使用预载的示例数据探索",
+    "termsPrefix": "继续即表示您同意我们的",
+    "and": "和"
   },
   "notifications": {
     "title": "通知",
@@ -387,5 +441,93 @@
     "create": "创建提醒",
     "timeAgo": "{{time}} 前",
     "inTime": "{{time}} 后"
+  },
+  "tos": {
+    "title": "服务条款",
+    "lastUpdated": "最后更新",
+    "sections": {
+      "intro": {
+        "title": "1. 简介",
+        "content": "欢迎使用 Warmly。使用我们的应用程序即表示您同意这些服务条款。请在使用我们的服务前仔细阅读。Warmly 是一款专业社交应用程序，旨在帮助您管理和拓展您的专业人脉关系。"
+      },
+      "account": {
+        "title": "2. 账户条款",
+        "content": "您必须年满 18 岁才能使用此服务。您有责任维护账户和密码的安全。您对账户下发生的所有活动负责。创建账户时，您必须提供准确且完整的信息。"
+      },
+      "acceptableUse": {
+        "title": "3. 可接受的使用",
+        "content": "您同意不将 Warmly 用于任何非法目的，或以任何可能损害、禁用或损害服务的方式使用。您不得尝试未经授权访问服务的任何部分。您同意不上传任何恶意内容或垃圾邮件。您必须尊重其他用户的隐私和知识产权。"
+      },
+      "ip": {
+        "title": "4. 知识产权",
+        "content": "Warmly 及其原创内容、功能和特性均为 Warmly 所有，并受国际版权、商标和其他知识产权法律保护。您保留上传到 Warmly 的数据的所有权，但授予我们使用这些数据提供服务的许可。"
+      },
+      "termination": {
+        "title": "5. 终止",
+        "content": "我们可能随时终止或暂停您的账户，无论有无原因，无论有无通知。终止后，您使用服务的权利将立即停止。您也可以随时通过应用程序设置删除您的账户。"
+      },
+      "disclaimer": {
+        "title": "6. 免责声明",
+        "content": "服务按「现状」和「可用」提供，不提供任何形式的保证。我们不保证服务将不间断、及时、安全或无错误。我们对使用服务产生的任何引荐或专业关系不承担责任。"
+      },
+      "liability": {
+        "title": "7. 责任限制",
+        "content": "在任何情况下，Warmly、其董事、员工或代理人均不对因您使用服务而产生的任何间接、附带、特殊、后果性或惩罚性损害负责。我们的总责任不超过您在过去 12 个月内为服务支付的金额。"
+      },
+      "changes": {
+        "title": "8. 条款变更",
+        "content": "我们保留随时修改这些条款的权利。我们将通过电子邮件或应用程序通知用户任何重大变更。您在此类修改后继续使用服务即表示您接受更新后的条款。"
+      },
+      "contact": {
+        "title": "9. 联系我们",
+        "content": "如果您对这些服务条款有任何疑问，请通过 support@mywarmly.app 与我们联系。"
+      }
+    }
+  },
+  "privacy": {
+    "title": "隐私政策",
+    "lastUpdated": "最后更新",
+    "sections": {
+      "intro": {
+        "title": "1. 简介",
+        "content": "在 Warmly，我们非常重视您的隐私。本隐私政策说明了当您使用我们的移动应用程序时，我们如何收集、使用、披露和保护您的信息。请仔细阅读本政策，以了解我们对您个人数据的处理方式。"
+      },
+      "collection": {
+        "title": "2. 我们收集的信息",
+        "content": "我们收集您直接提供的信息，包括：您的姓名、电子邮件地址和个人资料；您添加到应用程序的联系信息（姓名、公司、电话号码、电子邮件）；您创建的关系数据和备注；您记录的互动历史。我们还会自动收集设备信息、使用数据和分析数据，以改善我们的服务。"
+      },
+      "usage": {
+        "title": "3. 我们如何使用您的信息",
+        "content": "我们使用您的信息来：提供和维护 Warmly 服务；个性化您的体验并提供 AI 驱动的功能；向您发送有关服务的重要更新；回应您的查询并提供客户支持；分析使用模式以改善我们的服务；遵守法律义务。"
+      },
+      "storage": {
+        "title": "4. 数据存储和安全",
+        "content": "您的数据安全地存储在我们的服务器上。我们实施适当的技术和组织措施，以保护您的个人信息免受未经授权的访问、更改、披露或破坏。然而，没有任何通过互联网传输的方法是 100% 安全的。"
+      },
+      "sharing": {
+        "title": "5. 数据共享",
+        "content": "我们不会将您的个人信息出售给第三方。我们可能会与以下方分享您的信息：协助运营我们应用程序的服务提供商；法律要求时的法律机构；经您明确同意的其他方。当您使用团队功能时，您可以控制与团队成员共享哪些联系信息。"
+      },
+      "rights": {
+        "title": "6. 您的权利",
+        "content": "您有权：访问我们持有的关于您的个人数据；要求更正不准确的数据；要求删除您的数据；以可携带格式导出您的数据；撤回对数据处理的同意；选择退出营销通讯。要行使这些权利，请通过 privacy@mywarmly.app 与我们联系。"
+      },
+      "security": {
+        "title": "7. 安全措施",
+        "content": "我们实施业界标准的安全措施，包括：加密数据传输（HTTPS/TLS）；使用 bcrypt 哈希的安全密码存储；定期安全审计和更新；访问控制和身份验证。我们鼓励您为 Warmly 账户使用强大、独特的密码。"
+      },
+      "children": {
+        "title": "8. 儿童隐私",
+        "content": "Warmly 不适合 18 岁以下的任何人使用。我们不会故意收集 18 岁以下儿童的个人信息。如果我们得知我们收集了 18 岁以下儿童的个人信息，我们将采取措施删除该信息。"
+      },
+      "changes": {
+        "title": "9. 本政策的变更",
+        "content": "我们可能会不时更新本隐私政策。我们将通过在应用程序中发布新政策并更新「最后更新」日期来通知您任何重大变更。我们鼓励您定期查看本政策。"
+      },
+      "contact": {
+        "title": "10. 联系我们",
+        "content": "如果您对本隐私政策或我们的数据处理方式有疑问或顾虑，请通过 privacy@mywarmly.app 与我们联系。"
+      }
+    }
   }
 }

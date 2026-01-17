@@ -135,6 +135,20 @@ contacts.post('/', async (c) => {
     now
   )
 
+  // Auto-share to teams where user has auto_share enabled
+  const autoShareTeams = db.query(`
+    SELECT team_id, auto_share_visibility
+    FROM team_members
+    WHERE user_id = ? AND auto_share = 1
+  `).all(userId) as { team_id: string; auto_share_visibility: string }[]
+
+  for (const team of autoShareTeams) {
+    db.query(`
+      INSERT INTO shared_contacts (contact_id, team_id, shared_by_id, visibility)
+      VALUES (?, ?, ?, ?)
+    `).run(id, team.team_id, userId, team.auto_share_visibility || 'basic')
+  }
+
   const contact = db.query('SELECT * FROM contacts WHERE id = ?').get(id) as Contact
 
   return c.json({ data: contact }, 201)

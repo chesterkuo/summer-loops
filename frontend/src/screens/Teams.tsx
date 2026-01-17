@@ -36,6 +36,16 @@ const Teams: React.FC<TeamsProps> = ({ onNavigate }) => {
   const [shareVisibility, setShareVisibility] = useState<'basic' | 'full'>('basic');
   const [isSharing, setIsSharing] = useState(false);
 
+  // Share All modal
+  const [showShareAllModal, setShowShareAllModal] = useState(false);
+  const [shareAllVisibility, setShareAllVisibility] = useState<'basic' | 'full'>('basic');
+  const [isSharingAll, setIsSharingAll] = useState(false);
+
+  // Auto-share settings
+  const [autoShareEnabled, setAutoShareEnabled] = useState(false);
+  const [autoShareVisibility, setAutoShareVisibility] = useState<'basic' | 'full'>('basic');
+  const [isUpdatingAutoShare, setIsUpdatingAutoShare] = useState(false);
+
   // Fetch teams on mount
   useEffect(() => {
     fetchTeams();
@@ -65,9 +75,10 @@ const Teams: React.FC<TeamsProps> = ({ onNavigate }) => {
 
   const viewTeamDetail = async (teamId: string) => {
     setIsLoadingDetail(true);
-    const [teamResult, contactsResult] = await Promise.all([
+    const [teamResult, contactsResult, autoShareResult] = await Promise.all([
       teamsApi.get(teamId),
       teamsApi.getContacts(teamId),
+      teamsApi.getAutoShare(teamId),
     ]);
 
     if (teamResult.data) {
@@ -75,6 +86,10 @@ const Teams: React.FC<TeamsProps> = ({ onNavigate }) => {
     }
     if (contactsResult.data) {
       setTeamContacts(contactsResult.data);
+    }
+    if (autoShareResult.data) {
+      setAutoShareEnabled(autoShareResult.data.autoShare);
+      setAutoShareVisibility((autoShareResult.data.visibility as 'basic' | 'full') || 'basic');
     }
     setIsLoadingDetail(false);
   };
@@ -129,6 +144,65 @@ const Teams: React.FC<TeamsProps> = ({ onNavigate }) => {
 
     await teamsApi.unshareContact(selectedTeam.id, contactId);
     setTeamContacts(teamContacts.filter(c => c.id !== contactId));
+  };
+
+  // Share ALL contacts
+  const shareAllContacts = async () => {
+    if (!selectedTeam) return;
+
+    setIsSharingAll(true);
+    const result = await teamsApi.shareAllContacts(selectedTeam.id, {
+      visibility: shareAllVisibility,
+    });
+
+    if (result.data) {
+      // Refresh shared contacts
+      const contactsResult = await teamsApi.getContacts(selectedTeam.id);
+      if (contactsResult.data) {
+        setTeamContacts(contactsResult.data);
+      }
+      setShowShareAllModal(false);
+    }
+    setIsSharingAll(false);
+  };
+
+  // Fetch auto-share settings
+  const fetchAutoShareSettings = async (teamId: string) => {
+    const result = await teamsApi.getAutoShare(teamId);
+    if (result.data) {
+      setAutoShareEnabled(result.data.autoShare);
+      setAutoShareVisibility((result.data.visibility as 'basic' | 'full') || 'basic');
+    }
+  };
+
+  // Toggle auto-share
+  const toggleAutoShare = async () => {
+    if (!selectedTeam) return;
+
+    setIsUpdatingAutoShare(true);
+    const newValue = !autoShareEnabled;
+    const result = await teamsApi.updateAutoShare(selectedTeam.id, {
+      autoShare: newValue,
+      visibility: autoShareVisibility,
+    });
+
+    if (result.data) {
+      setAutoShareEnabled(newValue);
+    }
+    setIsUpdatingAutoShare(false);
+  };
+
+  // Update auto-share visibility
+  const updateAutoShareVisibility = async (visibility: 'basic' | 'full') => {
+    if (!selectedTeam) return;
+
+    setAutoShareVisibility(visibility);
+    if (autoShareEnabled) {
+      await teamsApi.updateAutoShare(selectedTeam.id, {
+        autoShare: true,
+        visibility,
+      });
+    }
   };
 
   const getRoleBadgeColor = (role: string) => {
@@ -214,19 +288,76 @@ const Teams: React.FC<TeamsProps> = ({ onNavigate }) => {
               </div>
             </div>
 
+            {/* Auto-Share Settings */}
+            <div className="mb-6 bg-surface-card rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary text-[20px]">sync</span>
+                  <h3 className="text-sm font-bold text-white">{t('teams.autoShare')}</h3>
+                </div>
+                <button
+                  onClick={toggleAutoShare}
+                  disabled={isUpdatingAutoShare}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                    autoShareEnabled ? 'bg-primary' : 'bg-gray-600'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                      autoShareEnabled ? 'left-7' : 'left-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mb-3">{t('teams.autoShareDesc')}</p>
+              {autoShareEnabled && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => updateAutoShareVisibility('basic')}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+                      autoShareVisibility === 'basic'
+                        ? 'bg-primary/20 border-primary text-primary'
+                        : 'bg-transparent text-gray-400 border-gray-600'
+                    }`}
+                  >
+                    {t('teams.visibilityBasic')}
+                  </button>
+                  <button
+                    onClick={() => updateAutoShareVisibility('full')}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+                      autoShareVisibility === 'full'
+                        ? 'bg-primary/20 border-primary text-primary'
+                        : 'bg-transparent text-gray-400 border-gray-600'
+                    }`}
+                  >
+                    {t('teams.visibilityFull')}
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Shared Contacts Section */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-bold text-text-muted uppercase tracking-wider">
                   {t('teams.sharedContacts')} ({teamContacts.length})
                 </h3>
-                <button
-                  onClick={() => setShowShareModal(true)}
-                  className="flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded-lg text-xs font-bold hover:bg-primary/20 transition-colors"
-                >
-                  <span className="material-symbols-outlined text-[14px]">share</span>
-                  {t('teams.shareContact')}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowShareAllModal(true)}
+                    className="flex items-center gap-1 px-2 py-1 bg-blue-500/10 text-blue-400 rounded-lg text-xs font-bold hover:bg-blue-500/20 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">select_all</span>
+                    {t('teams.shareAll')}
+                  </button>
+                  <button
+                    onClick={() => setShowShareModal(true)}
+                    className="flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded-lg text-xs font-bold hover:bg-primary/20 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">share</span>
+                    {t('teams.shareContact')}
+                  </button>
+                </div>
               </div>
               {teamContacts.length === 0 ? (
                 <div className="text-center py-8 text-text-muted">
@@ -413,6 +544,83 @@ const Teams: React.FC<TeamsProps> = ({ onNavigate }) => {
                   className="flex-1 py-3 rounded-xl bg-primary hover:bg-primary-dark text-black text-sm font-bold transition-colors shadow-lg shadow-primary/20 disabled:opacity-50"
                 >
                   {isSharing ? t('common.loading') : t('teams.share')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Share All Modal */}
+        {showShareAllModal && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-[#2C3435] w-full max-w-sm rounded-2xl p-5 border border-white/10 shadow-2xl">
+              <h3 className="text-lg font-bold text-white mb-2">{t('teams.shareAllContacts')}</h3>
+              <p className="text-sm text-gray-400 mb-4">{t('teams.shareAllDesc')}</p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">
+                    {t('teams.visibility')}
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShareAllVisibility('basic')}
+                      className={`flex-1 py-2 rounded-lg text-sm font-bold border transition-colors ${
+                        shareAllVisibility === 'basic'
+                          ? 'bg-primary text-black border-primary'
+                          : 'bg-transparent text-gray-400 border-gray-600 hover:border-gray-500'
+                      }`}
+                    >
+                      {t('teams.visibilityBasic')}
+                    </button>
+                    <button
+                      onClick={() => setShareAllVisibility('full')}
+                      className={`flex-1 py-2 rounded-lg text-sm font-bold border transition-colors ${
+                        shareAllVisibility === 'full'
+                          ? 'bg-primary text-black border-primary'
+                          : 'bg-transparent text-gray-400 border-gray-600 hover:border-gray-500'
+                      }`}
+                    >
+                      {t('teams.visibilityFull')}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    {shareAllVisibility === 'basic' ? t('teams.visibilityBasicDesc') : t('teams.visibilityFullDesc')}
+                  </p>
+                </div>
+
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+                  <p className="text-xs text-yellow-400 flex items-start gap-2">
+                    <span className="material-symbols-outlined text-[16px] mt-0.5">info</span>
+                    {t('teams.shareAllWarning', { count: contacts.length })}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowShareAllModal(false)}
+                  disabled={isSharingAll}
+                  className="flex-1 py-3 rounded-xl bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold transition-colors disabled:opacity-50"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  onClick={shareAllContacts}
+                  disabled={isSharingAll || contacts.length === 0}
+                  className="flex-1 py-3 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold transition-colors shadow-lg shadow-blue-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isSharingAll ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      {t('common.loading')}
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[18px]">select_all</span>
+                      {t('teams.shareAll')}
+                    </>
+                  )}
                 </button>
               </div>
             </div>

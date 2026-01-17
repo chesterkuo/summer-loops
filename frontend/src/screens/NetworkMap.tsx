@@ -362,6 +362,13 @@ const NetworkMap: React.FC<NetworkMapProps> = ({ onNavigate }) => {
                         const targetPos = nodePositions[edge.target];
                         if (!sourcePos || !targetPos) return null;
                         const opacity = 0.1 + (edge.strength / 10) * 0.4;
+                        // Use blue color for team edges
+                        const isTeamEdge = (edge as any).isTeamEdge;
+                        const strokeColor = isTeamEdge
+                          ? '#3B82F6'  // Blue for team edges
+                          : edge.source === 'user'
+                            ? '#39E079'  // Green for user edges
+                            : '#4CE6E6'; // Cyan for other edges
                         return (
                           <line
                             key={i}
@@ -369,9 +376,10 @@ const NetworkMap: React.FC<NetworkMapProps> = ({ onNavigate }) => {
                             y1={sourcePos.y}
                             x2={targetPos.x}
                             y2={targetPos.y}
-                            stroke={edge.source === 'user' ? '#39E079' : '#4CE6E6'}
+                            stroke={strokeColor}
                             strokeWidth={edge.strength > 7 ? 2 : 1}
-                            strokeOpacity={opacity}
+                            strokeOpacity={isTeamEdge ? opacity + 0.2 : opacity}
+                            strokeDasharray={isTeamEdge ? '5,3' : undefined}
                           />
                         );
                       })}
@@ -391,8 +399,16 @@ const NetworkMap: React.FC<NetworkMapProps> = ({ onNavigate }) => {
                       const pos = nodePositions[node.id];
                       if (!pos) return null;
 
+                      // Check if this is a team contact or teammate
+                      const isTeammate = (node as any).isTeammate;
+                      const isTeamContact = (node as any).isTeamContact;
+                      const teamName = (node as any).teamName;
+
+                      // Use blue colors for team nodes
                       const ringColors = ['#4CE6E6', '#a855f7', '#eab308', '#ef4444'];
-                      const ringColor = ringColors[pos.ring % ringColors.length];
+                      const ringColor = isTeammate || isTeamContact
+                        ? '#3B82F6'  // Blue for team nodes
+                        : ringColors[pos.ring % ringColors.length];
                       const nodeSize = pos.ring === 1 ? 'size-14' : pos.ring === 2 ? 'size-12' : 'size-10';
                       const isSelected = selectedNodeId === node.id;
                       const isHighlighted = highlightedNodeId === node.id;
@@ -421,25 +437,39 @@ const NetworkMap: React.FC<NetworkMapProps> = ({ onNavigate }) => {
                             }}
                           >
                             <div
-                              className="w-full h-full rounded-full flex items-center justify-center bg-gradient-to-br from-gray-700 to-gray-800"
+                              className={`w-full h-full rounded-full flex items-center justify-center ${isTeammate ? 'bg-gradient-to-br from-blue-600 to-blue-800' : isTeamContact ? 'bg-gradient-to-br from-blue-500/30 to-blue-700/30' : 'bg-gradient-to-br from-gray-700 to-gray-800'}`}
                               style={{ borderColor: ringColor }}
                             >
-                              <span className="text-white font-bold text-sm">
-                                {node.name?.charAt(0)?.toUpperCase() || '?'}
-                              </span>
+                              {isTeammate ? (
+                                <span className="material-symbols-outlined text-white text-sm">groups</span>
+                              ) : (
+                                <span className="text-white font-bold text-sm">
+                                  {node.name?.charAt(0)?.toUpperCase() || '?'}
+                                </span>
+                              )}
                             </div>
-                            {node.degree >= 3 && (
+                            {node.degree >= 3 && !isTeammate && !isTeamContact && (
                               <div className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center text-black font-bold text-[8px] border border-black">
                                 {node.degree}
                               </div>
                             )}
+                            {isTeamContact && (
+                              <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center border border-black">
+                                <span className="material-symbols-outlined text-white text-[10px]">share</span>
+                              </div>
+                            )}
                           </div>
                           <span
-                            className={`mt-1 text-[10px] font-bold bg-black/50 px-1.5 py-0.5 rounded-full backdrop-blur-sm border truncate max-w-[80px] ${isSelected ? 'text-white' : 'text-gray-300'}`}
+                            className={`mt-1 text-[10px] font-bold bg-black/50 px-1.5 py-0.5 rounded-full backdrop-blur-sm border truncate max-w-[80px] ${isSelected ? 'text-white' : isTeammate || isTeamContact ? 'text-blue-300' : 'text-gray-300'}`}
                             style={{ borderColor: `${ringColor}40` }}
                           >
                             {node.name?.split(' ')[0] || t('networkMap.unknown')}
                           </span>
+                          {(isTeammate || isTeamContact) && teamName && (
+                            <span className="text-[8px] text-blue-400 bg-blue-500/20 px-1 py-0.5 rounded mt-0.5 truncate max-w-[80px]">
+                              {teamName}
+                            </span>
+                          )}
                         </div>
                       );
                     })}
@@ -548,22 +578,49 @@ const NetworkMap: React.FC<NetworkMapProps> = ({ onNavigate }) => {
           </div>
           {selectedNode ? (
             <div className="flex gap-4">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg bg-gradient-to-br from-primary/30 to-accent/30 border border-white/10 shadow-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-xl sm:text-2xl font-bold text-white">
-                  {selectedNode.name?.charAt(0)?.toUpperCase() || '?'}
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <h2 className="text-white text-lg sm:text-xl font-bold truncate">{selectedNode.name}</h2>
-                  <span className="bg-primary/20 text-primary border border-primary/20 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase whitespace-nowrap">
-                    {selectedNode.degree} {selectedNode.degree > 1 ? 'Connections' : 'Connection'}
-                  </span>
-                </div>
-                <p className="text-gray-400 text-sm truncate">
-                  {selectedNode.title || ''}{selectedNode.title && selectedNode.company ? ' at ' : ''}{selectedNode.company || t('networkMap.noCompanyInfo')}
-                </p>
-                <div className="mt-3 flex gap-2 sm:gap-3">
+              {(() => {
+                const isTeammate = (selectedNode as any).isTeammate;
+                const isTeamContact = (selectedNode as any).isTeamContact;
+                const teamName = (selectedNode as any).teamName;
+                const sharedBy = (selectedNode as any).sharedBy;
+                return (
+                  <>
+                    <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-lg ${isTeammate || isTeamContact ? 'bg-gradient-to-br from-blue-500/30 to-blue-700/30' : 'bg-gradient-to-br from-primary/30 to-accent/30'} border border-white/10 shadow-lg flex items-center justify-center flex-shrink-0`}>
+                      {isTeammate ? (
+                        <span className="material-symbols-outlined text-blue-400 text-2xl">groups</span>
+                      ) : (
+                        <span className="text-xl sm:text-2xl font-bold text-white">
+                          {selectedNode.name?.charAt(0)?.toUpperCase() || '?'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h2 className="text-white text-lg sm:text-xl font-bold truncate">{selectedNode.name}</h2>
+                        {isTeammate ? (
+                          <span className="bg-blue-500/20 text-blue-400 border border-blue-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase whitespace-nowrap">
+                            {t('pathDiscovery.teammate')}
+                          </span>
+                        ) : isTeamContact ? (
+                          <span className="bg-blue-500/20 text-blue-400 border border-blue-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase whitespace-nowrap">
+                            {t('pathDiscovery.teamContact')}
+                          </span>
+                        ) : (
+                          <span className="bg-primary/20 text-primary border border-primary/20 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase whitespace-nowrap">
+                            {selectedNode.degree} {selectedNode.degree > 1 ? 'Connections' : 'Connection'}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-gray-400 text-sm truncate">
+                        {isTeammate ? (
+                          <>{teamName && <span className="text-blue-400">{teamName}</span>}</>
+                        ) : isTeamContact ? (
+                          <>{sharedBy && <span>{t('pathDiscovery.via')} {sharedBy}</span>}{teamName && <span className="text-blue-400 ml-1">• {teamName}</span>}</>
+                        ) : (
+                          <>{selectedNode.title || ''}{selectedNode.title && selectedNode.company ? ' at ' : ''}{selectedNode.company || t('networkMap.noCompanyInfo')}</>
+                        )}
+                      </p>
+                      <div className="mt-3 flex gap-2 sm:gap-3">
                   <button
                     onClick={() => {
                       // Use selectedContact if available, otherwise create minimal contact from node
@@ -639,8 +696,11 @@ const NetworkMap: React.FC<NetworkMapProps> = ({ onNavigate }) => {
                     <span className="material-symbols-outlined text-[16px] sm:text-[18px]">handshake</span>
                     <span className="truncate">{t('networkMap.findPath')}</span>
                   </button>
-                </div>
-              </div>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           ) : (
             <div className="text-center py-4">

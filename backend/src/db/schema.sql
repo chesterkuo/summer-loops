@@ -1,13 +1,16 @@
 -- Summer Loop Database Schema
 -- SQLite3 with Bun
 
--- Users (Google OAuth)
+-- Users (Email/Password + Google OAuth)
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
   name TEXT NOT NULL,
   avatar_url TEXT,
-  google_id TEXT UNIQUE NOT NULL,
+  password_hash TEXT,
+  google_id TEXT UNIQUE,
+  auth_provider TEXT DEFAULT 'email' CHECK(auth_provider IN ('email', 'google', 'demo')),
+  email_verified INTEGER DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -125,6 +128,8 @@ CREATE TABLE IF NOT EXISTS team_members (
   team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   role TEXT DEFAULT 'member' CHECK(role IN ('owner', 'admin', 'member')),
+  auto_share INTEGER DEFAULT 0,
+  auto_share_visibility TEXT DEFAULT 'basic' CHECK(auto_share_visibility IN ('basic', 'full')),
   PRIMARY KEY (team_id, user_id)
 );
 

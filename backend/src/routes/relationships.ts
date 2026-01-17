@@ -29,7 +29,7 @@ relationships.get('/', (c) => {
   return c.json({ data: rows })
 })
 
-// Get graph data for visualization
+// Get graph data for visualization (includes team shared contacts)
 relationships.get('/graph', (c) => {
   const db = getDb()
   const userId = c.get('user').userId
@@ -45,13 +45,15 @@ relationships.get('/graph', (c) => {
   ).all(userId) as Relationship[]
 
   // Build nodes (including user as center)
-  const nodes = [
+  const nodes: any[] = [
     {
       id: 'user',
       name: 'You',
       company: null,
       title: null,
-      degree: 0
+      degree: 0,
+      isTeamContact: false,
+      isTeammate: false
     },
     ...contacts.map(contact => {
       // Check if direct connection to user (is_user_relationship is stored as 0/1 integer)
@@ -64,21 +66,117 @@ relationships.get('/graph', (c) => {
         name: contact.name,
         company: contact.company,
         title: contact.title,
-        degree: directConnection ? 1 : 2
+        degree: directConnection ? 1 : 2,
+        isTeamContact: false,
+        isTeammate: false
       }
     })
   ]
 
   // Build edges (using snake_case as returned from SQLite)
-  const edges = rels.map(rel => {
+  const edges: any[] = rels.map(rel => {
     const r = rel as any
     return {
       source: r.is_user_relationship === 1 ? 'user' : r.contact_a_id,
       target: r.is_user_relationship === 1 ? r.contact_a_id : (r.contact_b_id || r.contact_a_id),
       strength: r.strength,
-      type: r.relationship_type
+      type: r.relationship_type,
+      isTeamEdge: false
     }
   })
+
+  // ============ ADD TEAM SHARED CONTACTS ============
+  // Get teams the user is a member of
+  const userTeams = db.query(`
+    SELECT t.id as team_id, t.name as team_name
+    FROM teams t
+    JOIN team_members tm ON t.id = tm.team_id
+    WHERE tm.user_id = ?
+  `).all(userId) as { team_id: string; team_name: string }[]
+
+  const addedTeammates = new Set<string>()
+  const addedTeamContacts = new Set<string>()
+
+  for (const team of userTeams) {
+    // Get team members (excluding current user)
+    const teamMembers = db.query(`
+      SELECT tm.user_id, u.name as user_name
+      FROM team_members tm
+      JOIN users u ON tm.user_id = u.id
+      WHERE tm.team_id = ? AND tm.user_id != ?
+    `).all(team.team_id, userId) as { user_id: string; user_name: string }[]
+
+    for (const member of teamMembers) {
+      const teammateNodeId = `teammate:${member.user_id}`
+
+      // Add teammate node (if not already added)
+      if (!addedTeammates.has(member.user_id)) {
+        addedTeammates.add(member.user_id)
+        nodes.push({
+          id: teammateNodeId,
+          name: member.user_name,
+          company: null,
+          title: 'Team Member',
+          degree: 1,
+          isTeamContact: false,
+          isTeammate: true,
+          teamName: team.team_name
+        })
+
+        // Add edge from user to teammate
+        edges.push({
+          source: 'user',
+          target: teammateNodeId,
+          strength: 4,
+          type: 'teammate',
+          isTeamEdge: true
+        })
+      }
+
+      // Get contacts shared by this team member
+      const sharedContacts = db.query(`
+        SELECT c.id, c.name, c.company, c.title, sc.visibility
+        FROM shared_contacts sc
+        JOIN contacts c ON sc.contact_id = c.id
+        WHERE sc.team_id = ? AND sc.shared_by_id = ?
+      `).all(team.team_id, member.user_id) as {
+        id: string
+        name: string
+        company: string | null
+        title: string | null
+        visibility: string
+      }[]
+
+      for (const sharedContact of sharedContacts) {
+        const teamContactId = `team:${team.team_id}:${sharedContact.id}`
+
+        // Add team contact node (if not already added)
+        if (!addedTeamContacts.has(teamContactId)) {
+          addedTeamContacts.add(teamContactId)
+          nodes.push({
+            id: teamContactId,
+            name: sharedContact.name,
+            company: sharedContact.company,
+            title: sharedContact.title,
+            degree: 2,
+            isTeamContact: true,
+            isTeammate: false,
+            teamName: team.team_name,
+            sharedBy: member.user_name
+          })
+        }
+
+        // Add edge from teammate to their shared contact
+        edges.push({
+          source: teammateNodeId,
+          target: teamContactId,
+          strength: 3,
+          type: 'team_shared',
+          isTeamEdge: true
+        })
+      }
+    }
+  }
 
   return c.json({
     data: {

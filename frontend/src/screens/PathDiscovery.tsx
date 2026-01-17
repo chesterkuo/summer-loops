@@ -224,6 +224,10 @@ const PathDiscovery: React.FC<PathDiscoveryProps> = ({ onNavigate }) => {
                 const isConnector = !isFirst && !isLast;
                 const edge = bestPath.edges[index];
                 const contact = contacts.find(c => c.id === node.contactId);
+                const isTeamNode = !!(node as any).teamSource;
+                const teamSource = (node as any).teamSource;
+                const isTeammate = node.contactId?.startsWith('teammate:');
+                const isTeamContact = node.contactId?.startsWith('team:');
 
                 return (
                   <React.Fragment key={node.contactId}>
@@ -238,10 +242,10 @@ const PathDiscovery: React.FC<PathDiscoveryProps> = ({ onNavigate }) => {
                       }}
                     >
                       {isConnector && (
-                        <div className="absolute -inset-4 bg-primary/10 rounded-2xl blur-xl group-hover:bg-primary/20 transition-colors"></div>
+                        <div className={`absolute -inset-4 ${isTeammate ? 'bg-blue-500/10' : 'bg-primary/10'} rounded-2xl blur-xl group-hover:${isTeammate ? 'bg-blue-500/20' : 'bg-primary/20'} transition-colors`}></div>
                       )}
                       <div className="relative z-10">
-                        <div className={`${isConnector ? 'w-24 h-24 rounded-2xl' : 'w-20 h-20 rounded-full'} bg-surface-card p-1 ${isFirst ? 'border-2 border-dashed border-primary/30' : isConnector ? 'shadow-[0_0_20px_rgba(57,224,121,0.2)] border border-primary ring-2 ring-primary/20' : 'border-2 border-gray-600 opacity-60'} ${isConnector ? 'group-hover:scale-105' : ''} transition-transform duration-300 flex items-center justify-center bg-gradient-to-br from-gray-700 to-gray-800`}>
+                        <div className={`${isConnector ? 'w-24 h-24 rounded-2xl' : 'w-20 h-20 rounded-full'} bg-surface-card p-1 ${isFirst ? 'border-2 border-dashed border-primary/30' : isConnector ? (isTeammate ? 'shadow-[0_0_20px_rgba(59,130,246,0.2)] border border-blue-500 ring-2 ring-blue-500/20' : 'shadow-[0_0_20px_rgba(57,224,121,0.2)] border border-primary ring-2 ring-primary/20') : isTeamContact ? 'border-2 border-blue-400/60' : 'border-2 border-gray-600 opacity-60'} ${isConnector ? 'group-hover:scale-105' : ''} transition-transform duration-300 flex items-center justify-center bg-gradient-to-br from-gray-700 to-gray-800`}>
                           <span className={`font-bold text-white ${isConnector ? 'text-2xl' : 'text-xl'}`}>
                             {node.name?.charAt(0)?.toUpperCase() || '?'}
                           </span>
@@ -249,9 +253,19 @@ const PathDiscovery: React.FC<PathDiscoveryProps> = ({ onNavigate }) => {
                         {isFirst && (
                           <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-surface-card px-2.5 py-0.5 rounded-full text-[10px] font-bold border border-gray-700 text-gray-300 shadow-sm">YOU</div>
                         )}
-                        {isConnector && (
+                        {isTeammate && (
+                          <div className="absolute -top-3 -right-3 bg-blue-500 text-white p-1.5 rounded-full border-4 border-background-dark shadow-lg">
+                            <span className="material-symbols-outlined text-[16px] font-bold block">groups</span>
+                          </div>
+                        )}
+                        {!isTeammate && isConnector && (
                           <div className="absolute -top-3 -right-3 bg-primary text-black p-1.5 rounded-full border-4 border-background-dark shadow-lg">
                             <span className="material-symbols-outlined text-[16px] font-bold block">star</span>
+                          </div>
+                        )}
+                        {isTeamContact && !isConnector && (
+                          <div className="absolute -top-2 -right-2 bg-blue-500 text-white p-1 rounded-full border-2 border-background-dark shadow-lg">
+                            <span className="material-symbols-outlined text-[12px] block">share</span>
                           </div>
                         )}
                       </div>
@@ -259,10 +273,17 @@ const PathDiscovery: React.FC<PathDiscoveryProps> = ({ onNavigate }) => {
                         <p className={`font-bold text-white ${isConnector ? 'text-base group-hover:text-primary' : 'text-sm'} transition-colors`}>
                           {node.name?.split(' ')[0] || t('networkMap.unknown')}
                         </p>
-                        {isConnector ? (
+                        {isTeammate ? (
+                          <p className="text-blue-400 text-[10px] font-bold uppercase tracking-wide bg-blue-500/10 px-2 py-0.5 rounded-full inline-block mt-0.5">{t('pathDiscovery.teammate')}</p>
+                        ) : isConnector ? (
                           <p className="text-primary text-[10px] font-bold uppercase tracking-wide bg-primary/10 px-2 py-0.5 rounded-full inline-block mt-0.5">{t('pathDiscovery.connector')}</p>
+                        ) : isTeamContact ? (
+                          <p className="text-blue-400 text-[10px] font-bold uppercase tracking-wide bg-blue-500/10 px-2 py-0.5 rounded-full inline-block mt-0.5">{t('pathDiscovery.teamContact')}</p>
                         ) : (
                           <p className="text-gray-500 text-[10px] font-medium uppercase tracking-wide">{node.title || node.company || ''}</p>
+                        )}
+                        {teamSource && !isTeammate && (
+                          <p className="text-blue-300 text-[9px] mt-0.5">{t('pathDiscovery.via')} {teamSource.teamName}</p>
                         )}
                       </div>
                     </div>

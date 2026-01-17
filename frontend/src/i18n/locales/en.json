@@ -87,7 +87,14 @@
     "myGoal": "My Goal",
     "addBio": "Add your goal or purpose",
     "bioPlaceholder": "e.g. Looking for a senior engineer role, or seeking investors for my startup...",
-    "bioHint": "This will be included in AI-generated intro requests to help your connections understand what you're looking for."
+    "bioHint": "This will be included in AI-generated intro requests to help your connections understand what you're looking for.",
+    "deleteAccount": "Delete Account",
+    "deleteAccountWarning": "This action cannot be undone. All your data including contacts, relationships, and account information will be permanently deleted.",
+    "confirmDelete": "Delete Account",
+    "deleting": "Deleting...",
+    "editContact": "Edit Contact",
+    "notesPlaceholder": "Add notes about this contact...",
+    "insightPlaceholder": "Add personal notes or insights about this contact..."
   },
   "analysis": {
     "title": "Relationship Analysis",
@@ -174,6 +181,9 @@
     "bestRouteFound": "Best Route Found",
     "introPath": "Introduction Path",
     "connector": "Connector",
+    "teammate": "Teammate",
+    "teamContact": "Team Contact",
+    "via": "via",
     "pathStrength": "Path Strength Analysis",
     "highResponse": "High response likelihood",
     "mediumResponse": "Medium response likelihood",
@@ -182,7 +192,6 @@
     "pathHops_plural": "This path has {{count}} hops and an overall strength of {{strength}}%.",
     "connectorHelp": "The connector {{name}} can help bridge the introduction.",
     "alternativePaths": "Alternative Paths",
-    "via": "Via {{names}}",
     "strong": "Strong",
     "medium": "Medium",
     "weak": "Weak",
@@ -287,16 +296,36 @@
   },
   "voiceMemo": {
     "title": "Voice Memo",
-    "startRecording": "Start Recording",
+    "startRecording": "Record",
     "stopRecording": "Stop Recording",
+    "stop": "Stop",
     "recording": "Recording",
     "processing": "Processing...",
     "tapToRecord": "Tap to start recording",
+    "tapToStart": "Tap mic to start recording",
     "speakNow": "Speak now...",
     "transcription": "Transcription",
     "saveAsNote": "Save as Note",
     "processedLocally": "Processed locally",
-    "liveTranscript": "Live Transcript"
+    "liveTranscript": "Live Transcript",
+    "transcriptPlaceholder": "Start recording and your speech will appear here...",
+    "readyToProcess": "Ready to process",
+    "processWithAI": "Process with AI",
+    "process": "Process",
+    "resume": "Resume",
+    "saveContact": "Save Contact",
+    "meetingNotes": "Meeting Notes",
+    "editBeforeSave": "Edit the extracted information before saving:",
+    "noContactFound": "No contact information found in the recording. Here's your transcript:",
+    "nameRequired": "Name is required",
+    "parseFailed": "Failed to parse transcript. Please try again.",
+    "saveFailed": "Failed to save contact. Please try again.",
+    "saveSuccess": "Contact saved successfully!",
+    "notSupported": "Not Supported",
+    "notSupportedDesc": "Speech recognition is not supported in this browser. Please try Chrome, Safari, or Edge.",
+    "micPermissionDenied": "Microphone permission denied. Please allow microphone access to use voice recording.",
+    "recognitionError": "Speech recognition error. Please try again.",
+    "startError": "Failed to start recording. Please try again."
   },
   "company": {
     "title": "Company",
@@ -364,7 +393,32 @@
     "visibilityFull": "Full",
     "visibilityBasicDesc": "Share name, company, and title only",
     "visibilityFullDesc": "Share all contact details including email and phone",
-    "share": "Share"
+    "share": "Share",
+    "shareAll": "Share All",
+    "shareAllContacts": "Share All Contacts",
+    "shareAllDesc": "Share all your contacts with this team at once.",
+    "shareAllWarning": "This will share {{count}} contacts with the team.",
+    "autoShare": "Auto-Share",
+    "autoShareDesc": "Automatically share new contacts you add with this team."
+  },
+  "login": {
+    "tagline": "Your professional network, simplified",
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "name": "Name",
+    "namePlaceholder": "Enter your name",
+    "email": "Email",
+    "emailPlaceholder": "Enter your email",
+    "password": "Password",
+    "passwordPlaceholder": "Enter your password",
+    "passwordHint": "Minimum 6 characters",
+    "signInButton": "Sign In",
+    "signUpButton": "Create Account",
+    "or": "or",
+    "tryDemo": "Try Demo Account",
+    "demoHint": "Explore with pre-loaded sample data",
+    "termsPrefix": "By continuing, you agree to our",
+    "and": "and"
   },
   "notifications": {
     "title": "Notifications",
@@ -387,5 +441,93 @@
     "create": "Create Reminder",
     "timeAgo": "{{time}} ago",
     "inTime": "in {{time}}"
+  },
+  "tos": {
+    "title": "Terms of Service",
+    "lastUpdated": "Last Updated",
+    "sections": {
+      "intro": {
+        "title": "1. Introduction",
+        "content": "Welcome to Warmly. By using our application, you agree to these Terms of Service. Please read them carefully before using our services. Warmly is a professional networking application designed to help you manage and grow your professional relationships."
+      },
+      "account": {
+        "title": "2. Account Terms",
+        "content": "You must be at least 18 years old to use this service. You are responsible for maintaining the security of your account and password. You are responsible for all activities that occur under your account. You must provide accurate and complete information when creating an account."
+      },
+      "acceptableUse": {
+        "title": "3. Acceptable Use",
+        "content": "You agree not to use Warmly for any unlawful purpose or in any way that could damage, disable, or impair the service. You must not attempt to gain unauthorized access to any part of the service. You agree not to upload any malicious content or spam. You must respect other users' privacy and intellectual property rights."
+      },
+      "ip": {
+        "title": "4. Intellectual Property",
+        "content": "Warmly and its original content, features, and functionality are owned by Warmly and are protected by international copyright, trademark, and other intellectual property laws. You retain ownership of the data you upload to Warmly, but grant us a license to use this data to provide the service."
+      },
+      "termination": {
+        "title": "5. Termination",
+        "content": "We may terminate or suspend your account at any time, with or without cause, with or without notice. Upon termination, your right to use the service will immediately cease. You may also delete your account at any time through the app settings."
+      },
+      "disclaimer": {
+        "title": "6. Disclaimer",
+        "content": "The service is provided \"as is\" and \"as available\" without any warranties of any kind. We do not guarantee that the service will be uninterrupted, timely, secure, or error-free. We are not responsible for any introductions or professional relationships that result from using the service."
+      },
+      "liability": {
+        "title": "7. Limitation of Liability",
+        "content": "In no event shall Warmly, its directors, employees, or agents be liable for any indirect, incidental, special, consequential, or punitive damages arising out of or relating to your use of the service. Our total liability shall not exceed the amount you paid for the service in the past 12 months."
+      },
+      "changes": {
+        "title": "8. Changes to Terms",
+        "content": "We reserve the right to modify these terms at any time. We will notify users of any material changes via email or through the application. Your continued use of the service after such modifications constitutes your acceptance of the updated terms."
+      },
+      "contact": {
+        "title": "9. Contact Us",
+        "content": "If you have any questions about these Terms of Service, please contact us at support@mywarmly.app."
+      }
+    }
+  },
+  "privacy": {
+    "title": "Privacy Policy",
+    "lastUpdated": "Last Updated",
+    "sections": {
+      "intro": {
+        "title": "1. Introduction",
+        "content": "At Warmly, we take your privacy seriously. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application. Please read this policy carefully to understand our practices regarding your personal data."
+      },
+      "collection": {
+        "title": "2. Information We Collect",
+        "content": "We collect information you provide directly, including: your name, email address, and profile information; contact information you add to the app (names, companies, phone numbers, emails); relationship data and notes you create; interaction history you log. We also automatically collect device information, usage data, and analytics to improve our service."
+      },
+      "usage": {
+        "title": "3. How We Use Your Information",
+        "content": "We use your information to: provide and maintain the Warmly service; personalize your experience and provide AI-powered features; send you important updates about the service; respond to your inquiries and provide customer support; analyze usage patterns to improve our service; comply with legal obligations."
+      },
+      "storage": {
+        "title": "4. Data Storage and Security",
+        "content": "Your data is stored securely on our servers. We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction. However, no method of transmission over the Internet is 100% secure."
+      },
+      "sharing": {
+        "title": "5. Data Sharing",
+        "content": "We do not sell your personal information to third parties. We may share your information with: service providers who assist in operating our application; legal authorities when required by law; other parties with your explicit consent. When you use the Teams feature, you control what contact information is shared with team members."
+      },
+      "rights": {
+        "title": "6. Your Rights",
+        "content": "You have the right to: access the personal data we hold about you; request correction of inaccurate data; request deletion of your data; export your data in a portable format; withdraw consent for data processing; opt out of marketing communications. To exercise these rights, please contact us at privacy@mywarmly.app."
+      },
+      "security": {
+        "title": "7. Security Measures",
+        "content": "We implement industry-standard security measures including: encrypted data transmission (HTTPS/TLS); secure password storage using bcrypt hashing; regular security audits and updates; access controls and authentication. We encourage you to use a strong, unique password for your Warmly account."
+      },
+      "children": {
+        "title": "8. Children's Privacy",
+        "content": "Warmly is not intended for use by anyone under the age of 18. We do not knowingly collect personal information from children under 18. If we learn that we have collected personal information from a child under 18, we will take steps to delete that information."
+      },
+      "changes": {
+        "title": "9. Changes to This Policy",
+        "content": "We may update this Privacy Policy from time to time. We will notify you of any material changes by posting the new policy in the app and updating the \"Last Updated\" date. We encourage you to review this policy periodically."
+      },
+      "contact": {
+        "title": "10. Contact Us",
+        "content": "If you have questions or concerns about this Privacy Policy or our data practices, please contact us at privacy@mywarmly.app."
+      }
+    }
   }
 }

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Routes, Route } from 'react-router-dom';
 import Dashboard from './screens/Dashboard';
 import Profile from './screens/Profile';
 import ScanCard from './screens/ScanCard';
@@ -9,12 +10,22 @@ import DraftRequest from './screens/DraftRequest';
 import CompanyDetail from './screens/CompanyDetail';
 import Search from './screens/Search';
 import Teams from './screens/Teams';
+import Login from './screens/Login';
+import TermsOfService from './screens/TermsOfService';
+import PrivacyPolicy from './screens/PrivacyPolicy';
+import { useAuthStore } from './stores/authStore';
 
 // Navigation types
 export type ScreenName = 'dashboard' | 'profile' | 'scan' | 'map' | 'voice' | 'path' | 'draft' | 'company' | 'search' | 'teams';
 
-const App: React.FC = () => {
+// Main app component (authenticated)
+const MainApp: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<ScreenName>('dashboard');
+  const { isAuthenticated, isLoading, initialize } = useAuthStore();
+
+  useEffect(() => {
+    initialize();
+  }, []);
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -32,12 +43,48 @@ const App: React.FC = () => {
     }
   };
 
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="flex justify-center min-h-screen bg-black">
+        <div className="w-full max-w-md bg-background-dark h-screen flex items-center justify-center shadow-2xl border-x border-gray-800">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-text-muted">Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login screen if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="flex justify-center min-h-screen bg-black">
+        <div className="w-full max-w-md bg-background-dark h-screen overflow-hidden relative shadow-2xl border-x border-gray-800 flex flex-col">
+          <Login onAuthenticated={() => setCurrentScreen('dashboard')} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex justify-center min-h-screen bg-black">
       <div className="w-full max-w-md bg-background-dark h-screen overflow-hidden relative shadow-2xl border-x border-gray-800 flex flex-col">
         {renderScreen()}
       </div>
     </div>
+  );
+};
+
+// App with routes
+const App: React.FC = () => {
+  return (
+    <Routes>
+      <Route path="/tos" element={<TermsOfService />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/*" element={<MainApp />} />
+    </Routes>
   );
 };
 

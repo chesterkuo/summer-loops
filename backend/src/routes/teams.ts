@@ -345,4 +345,100 @@ teams.get('/:id/contacts', (c) => {
   return c.json({ data: contacts })
 })
 
+// Share ALL contacts with team (bulk share)
+teams.post('/:id/share-all', async (c) => {
+  const db = getDb()
+  const userId = c.get('user').userId
+  const { id } = c.req.param()
+  const body = await c.req.json<{ visibility?: 'basic' | 'full' }>()
+
+  // Verify user is team member
+  const membership = db.query(
+    'SELECT role FROM team_members WHERE team_id = ? AND user_id = ?'
+  ).get(id, userId)
+
+  if (!membership) {
+    return c.json({ error: 'Not a team member' }, 403)
+  }
+
+  // Get all user's contacts that are not already shared
+  const userContacts = db.query(`
+    SELECT c.id FROM contacts c
+    WHERE c.user_id = ?
+    AND c.id NOT IN (
+      SELECT contact_id FROM shared_contacts WHERE team_id = ?
+    )
+  `).all(userId, id) as { id: string }[]
+
+  const visibility = body.visibility || 'basic'
+  let sharedCount = 0
+
+  // Share each contact
+  for (const contact of userContacts) {
+    db.query(`
+      INSERT INTO shared_contacts (contact_id, team_id, shared_by_id, visibility)
+      VALUES (?, ?, ?, ?)
+    `).run(contact.id, id, userId, visibility)
+    sharedCount++
+  }
+
+  return c.json({
+    data: { sharedCount },
+    message: `Shared ${sharedCount} contacts`
+  }, 201)
+})
+
+// Get user's auto-share setting for a team
+teams.get('/:id/auto-share', (c) => {
+  const db = getDb()
+  const userId = c.get('user').userId
+  const { id } = c.req.param()
+
+  const membership = db.query(
+    'SELECT auto_share, auto_share_visibility FROM team_members WHERE team_id = ? AND user_id = ?'
+  ).get(id, userId) as { auto_share: number; auto_share_visibility: string } | null
+
+  if (!membership) {
+    return c.json({ error: 'Not a team member' }, 403)
+  }
+
+  return c.json({
+    data: {
+      autoShare: !!membership.auto_share,
+      visibility: membership.auto_share_visibility || 'basic'
+    }
+  })
+})
+
+// Update user's auto-share setting for a team
+teams.put('/:id/auto-share', async (c) => {
+  const db = getDb()
+  const userId = c.get('user').userId
+  const { id } = c.req.param()
+  const body = await c.req.json<{ autoShare: boolean; visibility?: 'basic' | 'full' }>()
+
+  // Verify user is team member
+  const membership = db.query(
+    'SELECT role FROM team_members WHERE team_id = ? AND user_id = ?'
+  ).get(id, userId)
+
+  if (!membership) {
+    return c.json({ error: 'Not a team member' }, 403)
+  }
+
+  db.query(`
+    UPDATE team_members
+    SET auto_share = ?, auto_share_visibility = ?
+    WHERE team_id = ? AND user_id = ?
+  `).run(body.autoShare ? 1 : 0, body.visibility || 'basic', id, userId)
+
+  return c.json({
+    data: {
+      autoShare: body.autoShare,
+      visibility: body.visibility || 'basic'
+    },
+    message: 'Auto-share settings updated'
+  })
+})
+
 export default teams

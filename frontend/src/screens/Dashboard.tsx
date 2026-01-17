@@ -19,31 +19,16 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const [showAllOpportunities, setShowAllOpportunities] = useState(false);
   const [noteText, setNoteText] = useState('');
 
-  const { user, isAuthenticated, isLoading: authLoading, demoLogin, initialize } = useAuthStore();
+  const { user } = useAuthStore();
   const { contacts, graphData, fetchContacts, fetchGraph, parseText, createContact, isLoading, setSelectedContact } = useContactStore();
   const { activeCount, openPanel, fetchNotifications } = useNotificationStore();
 
-  // Initialize auth and fetch data on mount
+  // Fetch contacts and notifications on mount
   useEffect(() => {
-    const init = async () => {
-      await initialize();
-      // Auto-login with demo if not authenticated
-      const store = useAuthStore.getState();
-      if (!store.isAuthenticated) {
-        await demoLogin();
-      }
-    };
-    init();
+    fetchContacts();
+    fetchGraph();
+    fetchNotifications();
   }, []);
-
-  // Fetch contacts and notifications when authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchContacts();
-      fetchGraph();
-      fetchNotifications();
-    }
-  }, [isAuthenticated]);
 
   const handleSaveNote = async () => {
     if (!noteText.trim()) return;
@@ -79,15 +64,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     }
     return { label: t('dashboard.nthDegree', { n: degree }), bgClass: 'bg-gray-900/30', textClass: 'text-gray-400' };
   };
-
-  if (authLoading) {
-    return (
-      <div className="flex flex-col h-full bg-background-dark items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-        <p className="text-text-muted mt-4">{t('common.loading')}</p>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col h-full bg-background-dark font-display text-white overflow-hidden relative">

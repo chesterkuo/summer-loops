@@ -13,6 +13,14 @@ cd "$FRONTEND_DIR"
 echo "=== Warmly VoltBuilder Build Script ==="
 echo ""
 
+# Step 0: Auto-increment build number
+echo "[0/6] Incrementing build number..."
+CURRENT_BUILD=$(grep -o '"build": "[0-9]*"' voltbuilder.json | grep -o '[0-9]*')
+NEW_BUILD=$((CURRENT_BUILD + 1))
+sed -i "s/\"build\": \"$CURRENT_BUILD\"/\"build\": \"$NEW_BUILD\"/" voltbuilder.json
+sed -i "s/\"buildNumber\": \"$CURRENT_BUILD\"/\"buildNumber\": \"$NEW_BUILD\"/" voltbuilder.json
+echo "  Build number: $CURRENT_BUILD -> $NEW_BUILD"
+
 # Step 1: Check for required files
 echo "[1/6] Checking required files..."
 
