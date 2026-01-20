@@ -29,6 +29,7 @@
     "home": "Inicio",
     "network": "Red",
     "insights": "Análisis",
+    "finder": "Buscador",
     "profile": "Perfil",
     "voice": "Voz"
   },
@@ -264,5 +265,43 @@
     "th": "ไทย",
     "es": "Español",
     "fr": "Français"
+  },
+  "support": {
+    "title": "Ayuda y Soporte",
+    "subtitle": "Estamos aquí para ayudarte a aprovechar al máximo Warmly",
+    "sections": {
+      "contact": {
+        "title": "Contáctanos",
+        "content": "¿Tienes alguna pregunta, encontraste un error o necesitas ayuda? Envíanos un correo electrónico y te responderemos lo antes posible."
+      },
+      "faq": {
+        "title": "Preguntas Frecuentes",
+        "q1": {
+          "question": "¿Cómo agrego un nuevo contacto?",
+          "answer": "Puedes agregar contactos escaneando una tarjeta de presentación, usando la función de nota rápida con lenguaje natural, o ingresando manualmente los datos del contacto desde el panel de control."
+        },
+        "q2": {
+          "question": "¿Cómo funciona el escaneo de tarjetas con IA?",
+          "answer": "Simplemente apunta tu cámara a una tarjeta de presentación y nuestra IA extraerá automáticamente la información de contacto incluyendo nombre, empresa, cargo, correo electrónico y número de teléfono."
+        },
+        "q3": {
+          "question": "¿Están seguros mis datos?",
+          "answer": "Sí, nos tomamos la seguridad muy en serio. Todos los datos están encriptados en tránsito y en reposo. Puedes leer más sobre nuestras prácticas de seguridad en nuestra Política de Privacidad."
+        },
+        "q4": {
+          "question": "¿Cómo elimino mi cuenta?",
+          "answer": "Puedes eliminar tu cuenta desde la configuración de tu perfil. Esto eliminará permanentemente todos tus datos de nuestros servidores."
+        }
+      },
+      "response": {
+        "title": "Tiempo de Respuesta",
+        "content": "Normalmente respondemos a las consultas de soporte dentro de 24-48 horas en días hábiles. Para problemas urgentes, incluye 'URGENTE' en el asunto del correo."
+      },
+      "appInfo": {
+        "title": "Información de la App",
+        "version": "Versión",
+        "developer": "Desarrollador"
+      }
+    }
   }
 }

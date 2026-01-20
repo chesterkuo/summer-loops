@@ -18,7 +18,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ active, onNavigate }) => {
   };
 
   return (
-    <div className="fixed bottom-0 w-full max-w-md bg-surface-card/95 backdrop-blur-md border-t border-gray-800 pb-safe pt-2 z-40">
+    <div className="fixed bottom-0 w-full max-w-md md:max-w-full bg-surface-card/95 backdrop-blur-md border-t border-gray-800 pb-safe pt-2 z-40">
       <div className="flex justify-around items-center h-14">
         <button 
           onClick={() => onNavigate('dashboard')}

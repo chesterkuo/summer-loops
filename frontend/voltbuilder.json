@@ -5,7 +5,7 @@
   "title": "Warmly - Personal CRM",
   "description": "Personal CRM for meaningful connections",
   "version": "1.0.0",
-  "build": "52",
+  "build": "57",
   "author": "Warmly Team",
   "email": "chester.kuo1978@gmail.com",
 
@@ -20,7 +20,7 @@
   "ios": {
     "developmentTeam": "76TVWYJ6PL",
     "scheme": "App",
-    "buildNumber": "52"
+    "buildNumber": "57"
   },
 
   "iosUpload": true,

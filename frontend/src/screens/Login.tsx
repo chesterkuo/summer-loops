@@ -15,7 +15,7 @@ const Login: React.FC<LoginProps> = ({ onAuthenticated }) => {
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  const { login, signup, demoLogin, isLoading, error, clearError, isAuthenticated } = useAuthStore();
+  const { login, signup, isLoading, error, clearError, isAuthenticated } = useAuthStore();
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -46,14 +46,6 @@ const Login: React.FC<LoginProps> = ({ onAuthenticated }) => {
     }
   };
 
-  const handleDemoLogin = async () => {
-    clearError();
-    const success = await demoLogin();
-    if (success) {
-      onAuthenticated();
-    }
-  };
-
   const isFormValid = mode === 'login'
     ? email && password.length >= 6
     : email && password.length >= 6 && name.trim();
@@ -63,16 +55,16 @@ const Login: React.FC<LoginProps> = ({ onAuthenticated }) => {
       {/* Header */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
         {/* Logo */}
-        <div className="mb-8 text-center">
-          <div className="w-20 h-20 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-4 shadow-glow">
-            <span className="material-symbols-outlined text-4xl text-background-dark icon-filled">diversity_3</span>
+        <div className="mb-8 md:mb-12 text-center">
+          <div className="w-20 h-20 md:w-28 md:h-28 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-4 shadow-glow">
+            <span className="material-symbols-outlined text-4xl md:text-6xl text-background-dark icon-filled">diversity_3</span>
           </div>
-          <h1 className="text-3xl font-bold text-white">Warmly</h1>
-          <p className="text-text-muted text-sm mt-1">{t('login.tagline', 'Your professional network, simplified')}</p>
+          <h1 className="text-3xl md:text-4xl font-bold text-white">Warmly</h1>
+          <p className="text-text-muted text-sm md:text-base mt-1">{t('login.tagline', 'Your professional network, simplified')}</p>
         </div>
 
         {/* Form Card */}
-        <div className="w-full max-w-sm">
+        <div className="w-full max-w-sm md:max-w-md">
           {/* Mode Toggle */}
           <div className="flex rounded-xl bg-surface-card p-1 mb-6">
             <button
@@ -181,28 +173,6 @@ const Login: React.FC<LoginProps> = ({ onAuthenticated }) => {
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="flex items-center gap-4 my-6">
-            <div className="flex-1 h-px bg-gray-700"></div>
-            <span className="text-xs text-text-muted">{t('login.or', 'or')}</span>
-            <div className="flex-1 h-px bg-gray-700"></div>
-          </div>
-
-          {/* Demo Login */}
-          <button
-            onClick={handleDemoLogin}
-            disabled={isLoading}
-            className="w-full h-12 rounded-xl bg-surface-card border border-gray-700 text-white font-bold text-sm hover:bg-gray-800 transition-all disabled:opacity-50"
-          >
-            <span className="flex items-center justify-center gap-2">
-              <span className="material-symbols-outlined text-primary">play_circle</span>
-              {t('login.tryDemo', 'Try Demo Account')}
-            </span>
-          </button>
-
-          <p className="text-xs text-text-muted text-center mt-3">
-            {t('login.demoHint', 'Explore with pre-loaded sample data')}
-          </p>
         </div>
       </div>
 

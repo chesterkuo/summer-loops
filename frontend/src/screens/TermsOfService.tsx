@@ -120,7 +120,7 @@ const TermsOfService: React.FC = () => {
             <Link to="/" className="hover:text-primary transition-colors">{t('common.back')}</Link>
           </div>
           <p className="text-center text-xs text-text-muted mt-4">
-            &copy; 2025 Warmly. All rights reserved.
+            &copy; 2026 Summer Lab. All rights reserved.
           </p>
         </footer>
       </div>

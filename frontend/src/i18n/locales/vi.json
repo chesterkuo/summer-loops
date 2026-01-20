@@ -30,7 +30,8 @@
     "network": "Mạng lưới",
     "insights": "Phân tích",
     "profile": "Hồ sơ",
-    "voice": "Giọng nói"
+    "voice": "Giọng nói",
+    "finder": "Tìm kiếm"
   },
   "dashboard": {
     "greeting": "Chào buổi sáng",
@@ -264,5 +265,43 @@
     "th": "ไทย",
     "es": "Español",
     "fr": "Français"
+  },
+  "support": {
+    "title": "Trợ giúp và Hỗ trợ",
+    "subtitle": "Chúng tôi ở đây để giúp bạn tận dụng tối đa Warmly",
+    "sections": {
+      "contact": {
+        "title": "Liên hệ với chúng tôi",
+        "content": "Bạn có câu hỏi, phát hiện lỗi hoặc cần hỗ trợ? Gửi email cho chúng tôi và chúng tôi sẽ phản hồi sớm nhất có thể."
+      },
+      "faq": {
+        "title": "Câu hỏi thường gặp",
+        "q1": {
+          "question": "Làm thế nào để thêm liên hệ mới?",
+          "answer": "Bạn có thể thêm liên hệ bằng cách quét danh thiếp, sử dụng tính năng ghi chú nhanh bằng ngôn ngữ tự nhiên, hoặc nhập thông tin liên hệ thủ công từ bảng điều khiển."
+        },
+        "q2": {
+          "question": "Quét danh thiếp bằng AI hoạt động như thế nào?",
+          "answer": "Chỉ cần đưa camera hướng về danh thiếp và AI của chúng tôi sẽ tự động trích xuất thông tin liên hệ bao gồm tên, công ty, chức danh, email và số điện thoại."
+        },
+        "q3": {
+          "question": "Dữ liệu của tôi có an toàn không?",
+          "answer": "Có, chúng tôi rất coi trọng bảo mật. Tất cả dữ liệu được mã hóa khi truyền và khi lưu trữ. Bạn có thể đọc thêm về các biện pháp bảo mật của chúng tôi trong Chính sách bảo mật."
+        },
+        "q4": {
+          "question": "Làm thế nào để xóa tài khoản?",
+          "answer": "Bạn có thể xóa tài khoản từ cài đặt hồ sơ. Điều này sẽ xóa vĩnh viễn tất cả dữ liệu của bạn khỏi máy chủ của chúng tôi."
+        }
+      },
+      "response": {
+        "title": "Thời gian phản hồi",
+        "content": "Chúng tôi thường phản hồi các yêu cầu hỗ trợ trong vòng 24-48 giờ làm việc. Đối với các vấn đề khẩn cấp, vui lòng ghi 'KHẨN CẤP' trong tiêu đề email."
+      },
+      "appInfo": {
+        "title": "Thông tin ứng dụng",
+        "version": "Phiên bản",
+        "developer": "Nhà phát triển"
+      }
+    }
   }
 }

@@ -30,7 +30,8 @@
     "network": "Réseau",
     "insights": "Analyses",
     "profile": "Profil",
-    "voice": "Voix"
+    "voice": "Voix",
+    "finder": "Recherche"
   },
   "dashboard": {
     "greeting": "Bonjour",
@@ -264,5 +265,43 @@
     "th": "ไทย",
     "es": "Español",
     "fr": "Français"
+  },
+  "support": {
+    "title": "Aide et Support",
+    "subtitle": "Nous sommes là pour vous aider à tirer le meilleur parti de Warmly",
+    "sections": {
+      "contact": {
+        "title": "Contactez-nous",
+        "content": "Vous avez une question, trouvé un bug ou besoin d'aide ? Envoyez-nous un e-mail et nous vous répondrons dès que possible."
+      },
+      "faq": {
+        "title": "Questions Fréquentes",
+        "q1": {
+          "question": "Comment ajouter un nouveau contact ?",
+          "answer": "Vous pouvez ajouter des contacts en scannant une carte de visite, en utilisant la fonction de note rapide en langage naturel, ou en entrant manuellement les informations depuis le tableau de bord."
+        },
+        "q2": {
+          "question": "Comment fonctionne le scan de carte par IA ?",
+          "answer": "Pointez simplement votre appareil photo vers une carte de visite et notre IA extraira automatiquement les informations de contact, y compris le nom, l'entreprise, le poste, l'e-mail et le numéro de téléphone."
+        },
+        "q3": {
+          "question": "Mes données sont-elles sécurisées ?",
+          "answer": "Oui, nous prenons la sécurité très au sérieux. Toutes les données sont chiffrées en transit et au repos. Vous pouvez en savoir plus sur nos pratiques de sécurité dans notre Politique de Confidentialité."
+        },
+        "q4": {
+          "question": "Comment supprimer mon compte ?",
+          "answer": "Vous pouvez supprimer votre compte depuis les paramètres de votre profil. Cela supprimera définitivement toutes vos données de nos serveurs."
+        }
+      },
+      "response": {
+        "title": "Délai de Réponse",
+        "content": "Nous répondons généralement aux demandes de support dans les 24 à 48 heures ouvrables. Pour les problèmes urgents, incluez 'URGENT' dans l'objet de votre e-mail."
+      },
+      "appInfo": {
+        "title": "Informations sur l'Application",
+        "version": "Version",
+        "developer": "Développeur"
+      }
+    }
   }
 }

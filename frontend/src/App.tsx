@@ -13,6 +13,7 @@ import Teams from './screens/Teams';
 import Login from './screens/Login';
 import TermsOfService from './screens/TermsOfService';
 import PrivacyPolicy from './screens/PrivacyPolicy';
+import Support from './screens/Support';
 import { useAuthStore } from './stores/authStore';
 
 // Navigation types
@@ -46,8 +47,8 @@ const MainApp: React.FC = () => {
   // Show loading state while checking authentication
   if (isLoading) {
     return (
-      <div className="flex justify-center min-h-screen bg-black">
-        <div className="w-full max-w-md bg-background-dark h-screen flex items-center justify-center shadow-2xl border-x border-gray-800">
+      <div className="flex justify-center min-h-screen bg-black md:bg-background-dark">
+        <div className="w-full max-w-md md:max-w-full bg-background-dark h-screen flex items-center justify-center shadow-2xl border-x border-gray-800 md:border-0">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto mb-4"></div>
             <p className="text-text-muted">Loading...</p>
@@ -60,8 +61,8 @@ const MainApp: React.FC = () => {
   // Show login screen if not authenticated
   if (!isAuthenticated) {
     return (
-      <div className="flex justify-center min-h-screen bg-black">
-        <div className="w-full max-w-md bg-background-dark h-screen overflow-hidden relative shadow-2xl border-x border-gray-800 flex flex-col">
+      <div className="flex justify-center min-h-screen bg-black md:bg-background-dark">
+        <div className="w-full max-w-md md:max-w-full bg-background-dark h-screen overflow-hidden relative shadow-2xl border-x border-gray-800 md:border-0 flex flex-col">
           <Login onAuthenticated={() => setCurrentScreen('dashboard')} />
         </div>
       </div>
@@ -69,8 +70,8 @@ const MainApp: React.FC = () => {
   }
 
   return (
-    <div className="flex justify-center min-h-screen bg-black">
-      <div className="w-full max-w-md bg-background-dark h-screen overflow-hidden relative shadow-2xl border-x border-gray-800 flex flex-col">
+    <div className="flex justify-center min-h-screen bg-black md:bg-background-dark">
+      <div className="w-full max-w-md md:max-w-full bg-background-dark h-screen overflow-hidden relative shadow-2xl border-x border-gray-800 md:border-0 flex flex-col">
         {renderScreen()}
       </div>
     </div>
@@ -83,6 +84,7 @@ const App: React.FC = () => {
     <Routes>
       <Route path="/tos" element={<TermsOfService />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/support" element={<Support />} />
       <Route path="/*" element={<MainApp />} />
     </Routes>
   );
