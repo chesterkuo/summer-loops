@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { sql, generateId } from '../db/postgres.js'
 import { generateToken, getExpirationMs } from '../utils/jwt.js'
 import { authMiddleware } from '../middleware/auth.js'
+import { sendPasswordResetEmail } from '../utils/email.js'
 import type { User } from '../types/index.js'
 
 const auth = new Hono()
@@ -272,6 +273,120 @@ auth.get('/google/callback', async (c) => {
   } catch (error) {
     console.error('OAuth callback error:', error)
     return c.redirect(`${FRONTEND_URL}/login?error=auth_failed`)
+  }
+})
+
+// ==================== Password Reset ====================
+
+// Request password reset code
+auth.post('/forgot-password', async (c) => {
+  const body = await c.req.json() as { email?: string }
+
+  if (!body.email || !validateEmail(body.email)) {
+    return c.json({ message: 'If an account exists, a reset code has been sent.' })
+  }
+
+  const email = body.email.toLowerCase()
+
+  try {
+    const [user] = await sql<User[]>`SELECT * FROM users WHERE email = ${email}`
+
+    // Always return 200 — never reveal if email exists
+    if (!user) {
+      return c.json({ message: 'If an account exists, a reset code has been sent.' })
+    }
+
+    // Skip if Google-only or demo account
+    const authProvider = (user as any).auth_provider
+    if (authProvider === 'google' || authProvider === 'demo') {
+      return c.json({ message: 'If an account exists, a reset code has been sent.' })
+    }
+
+    // Rate limit: 1 per 60s per user
+    const [recentReset] = await sql`
+      SELECT id FROM password_resets
+      WHERE user_id = ${user.id} AND created_at > NOW() - INTERVAL '60 seconds'
+      ORDER BY created_at DESC LIMIT 1
+    `
+    if (recentReset) {
+      return c.json({ message: 'If an account exists, a reset code has been sent.' })
+    }
+
+    // Generate 6-digit code
+    const code = String(Math.floor(100000 + Math.random() * 900000))
+    const resetId = generateId()
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString()
+
+    // Invalidate old codes
+    await sql`UPDATE password_resets SET used = TRUE WHERE user_id = ${user.id} AND used = FALSE`
+
+    // Insert new reset
+    await sql`
+      INSERT INTO password_resets (id, user_id, code, expires_at)
+      VALUES (${resetId}, ${user.id}, ${code}, ${expiresAt})
+    `
+
+    // Send email
+    await sendPasswordResetEmail(email, code)
+
+    return c.json({ message: 'If an account exists, a reset code has been sent.' })
+  } catch (error) {
+    console.error('Forgot password error:', error)
+    return c.json({ message: 'If an account exists, a reset code has been sent.' })
+  }
+})
+
+// Reset password with code
+auth.post('/reset-password', async (c) => {
+  const body = await c.req.json() as { email?: string; code?: string; newPassword?: string }
+
+  if (!body.email || !validateEmail(body.email)) {
+    return c.json({ error: 'Valid email is required' }, 400)
+  }
+
+  if (!body.code || !/^\d{6}$/.test(body.code)) {
+    return c.json({ error: 'A valid 6-digit code is required' }, 400)
+  }
+
+  const passwordValidation = validatePassword(body.newPassword || '')
+  if (!passwordValidation.valid) {
+    return c.json({ error: passwordValidation.error }, 400)
+  }
+
+  const email = body.email.toLowerCase()
+
+  try {
+    const [user] = await sql<User[]>`SELECT * FROM users WHERE email = ${email}`
+    if (!user) {
+      return c.json({ error: 'Invalid code or email' }, 400)
+    }
+
+    const [reset] = await sql`
+      SELECT * FROM password_resets
+      WHERE user_id = ${user.id} AND code = ${body.code} AND used = FALSE AND expires_at > NOW()
+      ORDER BY created_at DESC LIMIT 1
+    `
+
+    if (!reset) {
+      return c.json({ error: 'Invalid or expired code' }, 400)
+    }
+
+    // Mark code as used
+    await sql`UPDATE password_resets SET used = TRUE WHERE id = ${reset.id}`
+
+    // Hash new password
+    const passwordHash = await Bun.password.hash(body.newPassword!, {
+      algorithm: 'bcrypt',
+      cost: 12,
+    })
+
+    // Update user password
+    await sql`UPDATE users SET password_hash = ${passwordHash}, updated_at = ${new Date().toISOString()} WHERE id = ${user.id}`
+
+    return c.json({ message: 'Password has been reset successfully' })
+  } catch (error) {
+    console.error('Reset password error:', error)
+    return c.json({ error: 'Failed to reset password' }, 500)
   }
 })
 

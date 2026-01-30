@@ -22,7 +22,7 @@ export type ScreenName = 'dashboard' | 'profile' | 'scan' | 'map' | 'voice' | 'p
 // Main app component (authenticated)
 const MainApp: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<ScreenName>('dashboard');
-  const { isAuthenticated, isLoading, initialize } = useAuthStore();
+  const { isAuthenticated, isInitialized, initialize } = useAuthStore();
 
   useEffect(() => {
     initialize();
@@ -44,8 +44,8 @@ const MainApp: React.FC = () => {
     }
   };
 
-  // Show loading state while checking authentication
-  if (isLoading) {
+  // Show loading state while checking authentication on startup
+  if (!isInitialized) {
     return (
       <div className="flex justify-center min-h-screen bg-black md:bg-background-dark">
         <div className="w-full max-w-md md:max-w-full bg-background-dark h-screen flex items-center justify-center shadow-2xl border-x border-gray-800 md:border-0">

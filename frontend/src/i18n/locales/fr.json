@@ -200,7 +200,7 @@
     "aiGenerated": "Ce message a été généré par l'IA en fonction de votre réseau et du ton sélectionné."
   },
   "scanCard": {
-    "title": "Scanner carte",
+    "title": "Poste",
     "batchScan": "Scan par lot ({{count}})",
     "takePhoto": "Prendre photo",
     "uploadImage": "Télécharger image",
@@ -217,7 +217,6 @@
     "unsavedProgress": "La progression non enregistrée sera perdue.",
     "extractedDetails": "Détails extraits",
     "name": "Nom",
-    "title": "Poste",
     "company": "Entreprise",
     "department": "Département",
     "departmentPlaceholder": "Ex: Marketing, Ingénierie",
@@ -303,5 +302,27 @@
         "developer": "Développeur"
       }
     }
+  },
+  "login": {
+    "forgotPassword": "Mot de passe oublié ?",
+    "resetPassword": "Réinitialiser le mot de passe",
+    "forgotPasswordDesc": "Entrez votre e-mail et nous vous enverrons un code de réinitialisation.",
+    "sendResetCode": "Envoyer le code",
+    "backToSignIn": "Retour à la connexion",
+    "checkEmail": "Vérifiez votre e-mail",
+    "checkEmailDesc": "Entrez le code à 6 chiffres envoyé à votre e-mail.",
+    "enterCode": "Entrez le code",
+    "codePlaceholder": "000000",
+    "verifyCode": "Vérifier",
+    "resendCode": "Renvoyer le code",
+    "codeSent": "Un nouveau code a été envoyé à votre e-mail.",
+    "setNewPassword": "Définir un nouveau mot de passe",
+    "newPassword": "Nouveau mot de passe",
+    "newPasswordPlaceholder": "Entrez le nouveau mot de passe",
+    "confirmPassword": "Confirmer le mot de passe",
+    "confirmPasswordPlaceholder": "Confirmez le nouveau mot de passe",
+    "passwordsDoNotMatch": "Les mots de passe ne correspondent pas",
+    "resetPasswordButton": "Réinitialiser le mot de passe",
+    "passwordResetSuccess": "Mot de passe réinitialisé avec succès. Vous pouvez maintenant vous connecter."
   }
 }

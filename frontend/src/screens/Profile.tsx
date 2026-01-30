@@ -673,7 +673,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto no-scrollbar pb-24 px-4 pt-2 flex flex-col gap-6 animate-fade-in">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar pb-24 px-4 pt-2 flex flex-col gap-6 animate-fade-in">
         {/* Loading / No Contact State */}
         {isLoading && (
           <div className="flex items-center justify-center py-20">
@@ -1063,7 +1063,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
 
         {/* Insight Card */}
         <div className="bg-surface-card p-6 rounded-2xl shadow-sm border border-white/5 relative group flex flex-col">
-          <div className="absolute -right-6 -top-6 w-24 h-24 bg-primary/10 rounded-full blur-2xl group-hover:bg-primary/20 transition-colors"></div>
+          <div className="absolute right-0 -top-6 w-24 h-24 bg-primary/10 rounded-full blur-2xl group-hover:bg-primary/20 transition-colors"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">

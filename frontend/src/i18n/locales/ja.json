@@ -200,7 +200,7 @@
     "aiGenerated": "このメッセージはあなたのネットワークと選択したトーンに基づいてAIが生成しました。"
   },
   "scanCard": {
-    "title": "名刺スキャン",
+    "title": "役職",
     "batchScan": "一括スキャン ({{count}})",
     "takePhoto": "写真を撮る",
     "uploadImage": "画像をアップロード",
@@ -217,7 +217,6 @@
     "unsavedProgress": "保存されていない進捗は失われます。",
     "extractedDetails": "抽出された情報",
     "name": "名前",
-    "title": "役職",
     "company": "会社",
     "department": "部署",
     "departmentPlaceholder": "例：マーケティング、エンジニアリング",
@@ -303,5 +302,27 @@
         "developer": "開発者"
       }
     }
+  },
+  "login": {
+    "forgotPassword": "パスワードをお忘れですか？",
+    "resetPassword": "パスワードリセット",
+    "forgotPasswordDesc": "メールアドレスを入力してください。リセットコードを送信します。",
+    "sendResetCode": "リセットコードを送信",
+    "backToSignIn": "ログインに戻る",
+    "checkEmail": "メールを確認",
+    "checkEmailDesc": "メールに送信された6桁のコードを入力してください。",
+    "enterCode": "コードを入力",
+    "codePlaceholder": "000000",
+    "verifyCode": "確認",
+    "resendCode": "コードを再送信",
+    "codeSent": "新しいコードがメールに送信されました。",
+    "setNewPassword": "新しいパスワードを設定",
+    "newPassword": "新しいパスワード",
+    "newPasswordPlaceholder": "新しいパスワードを入力",
+    "confirmPassword": "パスワードの確認",
+    "confirmPasswordPlaceholder": "新しいパスワードを確認",
+    "passwordsDoNotMatch": "パスワードが一致しません",
+    "resetPasswordButton": "パスワードをリセット",
+    "passwordResetSuccess": "パスワードがリセットされました。ログインできます。"
   }
 }

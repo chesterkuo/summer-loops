@@ -211,6 +211,20 @@ export const authApi = {
     }
     return result
   },
+
+  async forgotPassword(email: string) {
+    return apiFetch<{ message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    })
+  },
+
+  async resetPassword(email: string, code: string, newPassword: string) {
+    return apiFetch<{ message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, code, newPassword }),
+    })
+  },
 }
 
 // Contacts API

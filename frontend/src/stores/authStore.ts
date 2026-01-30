@@ -5,6 +5,7 @@ interface AuthState {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
+  isInitialized: boolean
   error: string | null
 
   // Actions
@@ -21,22 +22,23 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
-  isLoading: true,
+  isLoading: false,
+  isInitialized: false,
   error: null,
 
   initialize: async () => {
     const token = getAuthToken()
     if (!token) {
-      set({ isLoading: false, isAuthenticated: false })
+      set({ isInitialized: true, isAuthenticated: false })
       return
     }
 
     const result = await authApi.getMe()
     if (result.data) {
-      set({ user: result.data, isAuthenticated: true, isLoading: false })
+      set({ user: result.data, isAuthenticated: true, isInitialized: true })
     } else {
       setAuthToken(null)
-      set({ isLoading: false, isAuthenticated: false })
+      set({ isInitialized: true, isAuthenticated: false })
     }
   },
 

@@ -200,7 +200,7 @@
     "aiGenerated": "Este mensaje fue generado por IA basándose en tu red y el tono seleccionado."
   },
   "scanCard": {
-    "title": "Escanear tarjeta",
+    "title": "Cargo",
     "batchScan": "Escaneo por lotes ({{count}})",
     "takePhoto": "Tomar foto",
     "uploadImage": "Subir imagen",
@@ -217,7 +217,6 @@
     "unsavedProgress": "Se perderá el progreso no guardado.",
     "extractedDetails": "Detalles extraídos",
     "name": "Nombre",
-    "title": "Cargo",
     "company": "Empresa",
     "department": "Departamento",
     "departmentPlaceholder": "Ej: Marketing, Ingeniería",
@@ -303,5 +302,27 @@
         "developer": "Desarrollador"
       }
     }
+  },
+  "login": {
+    "forgotPassword": "¿Olvidaste tu contraseña?",
+    "resetPassword": "Restablecer contraseña",
+    "forgotPasswordDesc": "Ingresa tu correo electrónico y te enviaremos un código de restablecimiento.",
+    "sendResetCode": "Enviar código",
+    "backToSignIn": "Volver a iniciar sesión",
+    "checkEmail": "Revisa tu correo",
+    "checkEmailDesc": "Ingresa el código de 6 dígitos enviado a tu correo.",
+    "enterCode": "Ingresa el código",
+    "codePlaceholder": "000000",
+    "verifyCode": "Verificar",
+    "resendCode": "Reenviar código",
+    "codeSent": "Se ha enviado un nuevo código a tu correo.",
+    "setNewPassword": "Establecer nueva contraseña",
+    "newPassword": "Nueva contraseña",
+    "newPasswordPlaceholder": "Ingresa nueva contraseña",
+    "confirmPassword": "Confirmar contraseña",
+    "confirmPasswordPlaceholder": "Confirma la nueva contraseña",
+    "passwordsDoNotMatch": "Las contraseñas no coinciden",
+    "resetPasswordButton": "Restablecer contraseña",
+    "passwordResetSuccess": "Contraseña restablecida exitosamente. Ya puedes iniciar sesión."
   }
 }

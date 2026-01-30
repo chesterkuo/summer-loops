@@ -223,22 +223,79 @@ const NetworkMap: React.FC<NetworkMapProps> = ({ onNavigate }) => {
     <div className="relative w-full h-full flex flex-col bg-[#101323] overflow-hidden text-white font-display">
       
       {/* --- Header --- */}
-      <header className="absolute top-0 left-0 right-0 z-40 px-4 pt-4 pb-2 flex justify-between items-start pointer-events-none safe-area-top safe-area-inset-x">
-        <button onClick={() => onNavigate('dashboard')} className="pointer-events-auto flex items-center justify-center size-10 rounded-full bg-black/40 backdrop-blur-md text-white hover:bg-white/10 transition-colors border border-white/10">
-          <span className="material-symbols-outlined text-[20px]">arrow_back</span>
-        </button>
-        <div className="pointer-events-auto flex flex-col items-center pt-2">
-          <h1 className="text-white text-base font-bold tracking-wide uppercase opacity-80">{t('networkMap.title')}</h1>
-          <p className="text-primary text-xs font-medium">
-            {isLoading ? t('common.loading') : t('networkMap.connectionsCount', { count: (graphData?.nodes?.length || 1) - 1 })}
-          </p>
+      <header className="absolute top-0 left-0 right-0 z-40 px-4 pt-4 pb-2 pointer-events-none safe-area-top safe-area-inset-x">
+        <div className="flex justify-between items-center">
+          <button onClick={() => onNavigate('dashboard')} className="pointer-events-auto flex items-center justify-center size-10 rounded-full bg-black/40 backdrop-blur-md text-white hover:bg-white/10 transition-colors border border-white/10">
+            <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+          </button>
+          <div className="pointer-events-auto flex flex-col items-center">
+            <h1 className="text-white text-base font-bold tracking-wide uppercase opacity-80">{t('networkMap.title')}</h1>
+            <p className="text-primary text-xs font-medium">
+              {isLoading ? t('common.loading') : t('networkMap.connectionsCount', { count: (graphData?.nodes?.length || 1) - 1 })}
+            </p>
+          </div>
+          <button
+            onClick={() => setShowFilters(true)}
+            className="pointer-events-auto flex items-center justify-center size-10 rounded-full bg-primary text-black hover:bg-primary-dark transition-all shadow-[0_0_15px_rgba(57,224,121,0.4)] active:scale-90"
+          >
+            <span className="material-symbols-outlined text-[20px] font-bold">tune</span>
+          </button>
         </div>
-        <button 
-          onClick={() => setShowFilters(true)}
-          className="pointer-events-auto flex items-center justify-center size-10 rounded-full bg-primary text-black hover:bg-primary-dark transition-all shadow-[0_0_15px_rgba(57,224,121,0.4)] active:scale-90"
-        >
-          <span className="material-symbols-outlined text-[20px] font-bold">tune</span>
-        </button>
+        {/* Search bar - flows below header row */}
+        <div className="pointer-events-auto w-full max-w-sm mx-auto relative mt-2">
+          <div className="bg-[#1b1d28]/90 backdrop-blur-md border border-white/10 rounded-xl p-2.5 sm:p-3 flex items-center gap-2 shadow-lg">
+            <span className="material-symbols-outlined text-gray-400 text-[20px]">search</span>
+            <input
+              className="bg-transparent border-none text-white text-sm w-full focus:ring-0 outline-none placeholder:text-gray-500"
+              placeholder={t('networkMap.highlightPath')}
+              value={searchQuery}
+              onChange={handleSearchChange}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => { setSearchQuery(''); setHighlightedNodeId(null); }}
+                className="text-gray-400 hover:text-white p-1"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            )}
+          </div>
+
+          {/* Search Results Dropdown */}
+          {searchQuery && searchResults.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-[#1b1d28]/95 backdrop-blur-md border border-white/10 rounded-xl shadow-xl max-h-[50vh] overflow-y-auto overscroll-contain">
+              {searchResults.map(node => (
+                <button
+                  key={node.id}
+                  onClick={() => handleSelectSearchResult(node.id)}
+                  className={`w-full px-3 sm:px-4 py-3 flex items-center gap-3 hover:bg-white/10 active:bg-white/15 transition-colors text-left border-b border-white/5 last:border-0 ${
+                    highlightedNodeId === node.id ? 'bg-primary/20' : ''
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-bold text-sm">
+                      {node.name?.charAt(0)?.toUpperCase() || '?'}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-sm font-medium truncate">{node.name}</p>
+                    <p className="text-gray-400 text-xs truncate">
+                      {node.title}{node.title && node.company ? ' at ' : ''}{node.company || t('networkMap.noCompanyInfo')}
+                    </p>
+                  </div>
+                  <span className="material-symbols-outlined text-gray-500 text-[18px]">arrow_forward</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* No results message */}
+          {searchQuery && searchResults.length === 0 && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-[#1b1d28]/95 backdrop-blur-md border border-white/10 rounded-xl shadow-xl p-4 text-center">
+              <p className="text-gray-400 text-sm">{t('search.noResults')}</p>
+            </div>
+          )}
+        </div>
       </header>
 
       {/* --- Filter Modal Overlay --- */}
@@ -494,63 +551,6 @@ const NetworkMap: React.FC<NetworkMapProps> = ({ onNavigate }) => {
         </button>
       </div>
 
-      {/* --- Floating HUD (Fixed) --- */}
-      <div className="absolute top-[72px] sm:top-[80px] left-0 right-0 z-40 px-4 sm:px-4 w-full flex flex-col gap-3 pointer-events-none safe-area-inset-x">
-        <div className="pointer-events-auto w-full max-w-sm mx-auto relative">
-          <div className="bg-[#1b1d28]/90 backdrop-blur-md border border-white/10 rounded-xl p-2.5 sm:p-3 flex items-center gap-2 shadow-lg">
-            <span className="material-symbols-outlined text-gray-400 text-[20px]">search</span>
-            <input
-              className="bg-transparent border-none text-white text-sm w-full focus:ring-0 outline-none placeholder:text-gray-500"
-              placeholder={t('networkMap.highlightPath')}
-              value={searchQuery}
-              onChange={handleSearchChange}
-            />
-            {searchQuery && (
-              <button
-                onClick={() => { setSearchQuery(''); setHighlightedNodeId(null); }}
-                className="text-gray-400 hover:text-white p-1"
-              >
-                <span className="material-symbols-outlined text-[18px]">close</span>
-              </button>
-            )}
-          </div>
-
-          {/* Search Results Dropdown */}
-          {searchQuery && searchResults.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-[#1b1d28]/95 backdrop-blur-md border border-white/10 rounded-xl shadow-xl max-h-[50vh] overflow-y-auto overscroll-contain">
-              {searchResults.map(node => (
-                <button
-                  key={node.id}
-                  onClick={() => handleSelectSearchResult(node.id)}
-                  className={`w-full px-3 sm:px-4 py-3 flex items-center gap-3 hover:bg-white/10 active:bg-white/15 transition-colors text-left border-b border-white/5 last:border-0 ${
-                    highlightedNodeId === node.id ? 'bg-primary/20' : ''
-                  }`}
-                >
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center flex-shrink-0">
-                    <span className="text-white font-bold text-sm">
-                      {node.name?.charAt(0)?.toUpperCase() || '?'}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white text-sm font-medium truncate">{node.name}</p>
-                    <p className="text-gray-400 text-xs truncate">
-                      {node.title}{node.title && node.company ? ' at ' : ''}{node.company || t('networkMap.noCompanyInfo')}
-                    </p>
-                  </div>
-                  <span className="material-symbols-outlined text-gray-500 text-[18px]">arrow_forward</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* No results message */}
-          {searchQuery && searchResults.length === 0 && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-[#1b1d28]/95 backdrop-blur-md border border-white/10 rounded-xl shadow-xl p-4 text-center">
-              <p className="text-gray-400 text-sm">{t('search.noResults')}</p>
-            </div>
-          )}
-        </div>
-      </div>
 
       {/* --- Bottom Sheet Detail (Fixed) --- */}
       {(selectedNode || !graphData) && (

@@ -200,7 +200,7 @@
     "aiGenerated": "Tin nhắn này được AI tạo dựa trên mạng lưới và giọng điệu bạn chọn."
   },
   "scanCard": {
-    "title": "Quét danh thiếp",
+    "title": "Chức danh",
     "batchScan": "Quét hàng loạt ({{count}})",
     "takePhoto": "Chụp ảnh",
     "uploadImage": "Tải ảnh lên",
@@ -217,7 +217,6 @@
     "unsavedProgress": "Tiến trình chưa lưu sẽ bị mất.",
     "extractedDetails": "Thông tin trích xuất",
     "name": "Tên",
-    "title": "Chức danh",
     "company": "Công ty",
     "department": "Phòng ban",
     "departmentPlaceholder": "Ví dụ: Marketing, Kỹ thuật",
@@ -303,5 +302,27 @@
         "developer": "Nhà phát triển"
       }
     }
+  },
+  "login": {
+    "forgotPassword": "Quên mật khẩu?",
+    "resetPassword": "Đặt lại mật khẩu",
+    "forgotPasswordDesc": "Nhập email của bạn, chúng tôi sẽ gửi mã đặt lại.",
+    "sendResetCode": "Gửi mã đặt lại",
+    "backToSignIn": "Quay lại đăng nhập",
+    "checkEmail": "Kiểm tra email",
+    "checkEmailDesc": "Nhập mã 6 chữ số đã gửi đến email của bạn.",
+    "enterCode": "Nhập mã",
+    "codePlaceholder": "000000",
+    "verifyCode": "Xác minh",
+    "resendCode": "Gửi lại mã",
+    "codeSent": "Mã mới đã được gửi đến email của bạn.",
+    "setNewPassword": "Đặt mật khẩu mới",
+    "newPassword": "Mật khẩu mới",
+    "newPasswordPlaceholder": "Nhập mật khẩu mới",
+    "confirmPassword": "Xác nhận mật khẩu",
+    "confirmPasswordPlaceholder": "Xác nhận mật khẩu mới",
+    "passwordsDoNotMatch": "Mật khẩu không khớp",
+    "resetPasswordButton": "Đặt lại mật khẩu",
+    "passwordResetSuccess": "Đặt lại mật khẩu thành công. Bạn có thể đăng nhập ngay."
   }
 }

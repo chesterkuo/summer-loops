@@ -200,7 +200,7 @@
     "aiGenerated": "ข้อความนี้ถูกสร้างโดย AI ตามเครือข่ายและโทนที่คุณเลือก"
   },
   "scanCard": {
-    "title": "สแกนนามบัตร",
+    "title": "ตำแหน่ง",
     "batchScan": "สแกนเป็นชุด ({{count}})",
     "takePhoto": "ถ่ายรูป",
     "uploadImage": "อัปโหลดรูป",
@@ -217,7 +217,6 @@
     "unsavedProgress": "ความคืบหน้าที่ยังไม่ได้บันทึกจะหายไป",
     "extractedDetails": "ข้อมูลที่ดึงมา",
     "name": "ชื่อ",
-    "title": "ตำแหน่ง",
     "company": "บริษัท",
     "department": "แผนก",
     "departmentPlaceholder": "เช่น การตลาด, วิศวกรรม",
@@ -303,5 +302,27 @@
         "developer": "ผู้พัฒนา"
       }
     }
+  },
+  "login": {
+    "forgotPassword": "ลืมรหัสผ่าน?",
+    "resetPassword": "รีเซ็ตรหัสผ่าน",
+    "forgotPasswordDesc": "ป้อนอีเมลของคุณ แล้วเราจะส่งรหัสรีเซ็ตให้",
+    "sendResetCode": "ส่งรหัสรีเซ็ต",
+    "backToSignIn": "กลับไปเข้าสู่ระบบ",
+    "checkEmail": "ตรวจสอบอีเมลของคุณ",
+    "checkEmailDesc": "ป้อนรหัส 6 หลักที่ส่งไปยังอีเมลของคุณ",
+    "enterCode": "ป้อนรหัส",
+    "codePlaceholder": "000000",
+    "verifyCode": "ยืนยัน",
+    "resendCode": "ส่งรหัสอีกครั้ง",
+    "codeSent": "รหัสใหม่ได้ถูกส่งไปยังอีเมลของคุณแล้ว",
+    "setNewPassword": "ตั้งรหัสผ่านใหม่",
+    "newPassword": "รหัสผ่านใหม่",
+    "newPasswordPlaceholder": "ป้อนรหัสผ่านใหม่",
+    "confirmPassword": "ยืนยันรหัสผ่าน",
+    "confirmPasswordPlaceholder": "ยืนยันรหัสผ่านใหม่",
+    "passwordsDoNotMatch": "รหัสผ่านไม่ตรงกัน",
+    "resetPasswordButton": "รีเซ็ตรหัสผ่าน",
+    "passwordResetSuccess": "รีเซ็ตรหัสผ่านสำเร็จ คุณสามารถเข้าสู่ระบบได้แล้ว"
   }
 }
