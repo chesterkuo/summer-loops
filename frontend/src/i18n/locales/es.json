@@ -324,5 +324,73 @@
     "passwordsDoNotMatch": "Las contraseñas no coinciden",
     "resetPasswordButton": "Restablecer contraseña",
     "passwordResetSuccess": "Contraseña restablecida exitosamente. Ya puedes iniciar sesión."
+  },
+  "relationshipCoach": {
+    "title": "Coach de Relaciones",
+    "attentionCount": "{{count}} contactos necesitan atención",
+    "refresh": "Actualizar análisis",
+    "urgent": "Urgente",
+    "due": "Pendiente",
+    "maintain": "Mantener",
+    "healthy": "Saludable"
+  },
+  "meeting": {
+    "prepMeeting": "Preparar reunión",
+    "logMeeting": "Registrar reunión",
+    "briefTitle": "Resumen de reunión",
+    "logMeetingTitle": "Registrar reunión",
+    "generatingBrief": "Generando resumen...",
+    "summary": "Resumen",
+    "talkingPoints": "Puntos de conversación",
+    "relationshipContext": "Contexto de la relación",
+    "lastInteraction": "Última interacción",
+    "mutualConnections": "Conexiones mutuas",
+    "noBrief": "Error al generar el resumen.",
+    "logDescription": "Describe la reunión. La IA extraerá notas, acciones y seguimientos.",
+    "logPlaceholder": "Tomamos café y discutimos el nuevo proyecto. Necesito enviar la propuesta antes del viernes.",
+    "processWithAI": "Procesar con IA",
+    "interactionCreated": "Interacción registrada",
+    "actionItems": "Acciones pendientes",
+    "reminderCreated": "Recordatorio creado"
+  },
+  "smartReminders": {
+    "title": "Sugerencias IA",
+    "refresh": "Actualizar",
+    "accept": "Aceptar",
+    "dismiss": "Descartar"
+  },
+  "messaging": {
+    "integrations": "Integraciones de mensajería",
+    "connected": "Conectado",
+    "notConnected": "No conectado",
+    "connect": "Conectar",
+    "disconnect": "Desconectar",
+    "connectTitle": "Conectar {{platform}}",
+    "linkInstructions": "Abre {{platform}} y envía este código al bot de Warmly:",
+    "waitingForLink": "Esperando conexión... Este modal se cerrará automáticamente.",
+    "hint": "Conecta apps de mensajería para agregar contactos enviando tarjetas o descripciones al bot.",
+    "line": {
+      "step1AddBot": "Escanea el código QR para agregar el bot Warmly en LINE:",
+      "step2SendCode": "Envía este código al bot Warmly:"
+    },
+    "whatsapp": {
+      "connectWhatsApp": "Conectar WhatsApp",
+      "disconnectWhatsApp": "Desconectar",
+      "enterPhone": "Ingresa tu número de teléfono con código de país (ej. 14155551234):",
+      "getPairingCode": "Obtener Código",
+      "pairingCode": "Código de Emparejamiento",
+      "pairingInstructions": "Abre WhatsApp → Dispositivos Vinculados → Vincular Dispositivo → Vincular con Número, luego ingresa este código:",
+      "connecting": "Conectando...",
+      "connected": "Conectado",
+      "disconnected": "No conectado",
+      "importContacts": "Importar",
+      "selectContactsToImport": "Seleccionar Contactos para Importar",
+      "importSelected": "Importar {{count}} Contacto(s)",
+      "importSuccess": "Contactos importados exitosamente",
+      "noContactsFound": "No se encontraron contactos nuevos. Intenta sincronizar de nuevo.",
+      "connectionLost": "Conexión perdida",
+      "reconnecting": "Reconectando...",
+      "rateLimitWarning": "WhatsApp limita los intentos de emparejamiento. Si tu código es rechazado, espera entre 15 y 30 minutos antes de intentarlo de nuevo."
+    }
   }
 }

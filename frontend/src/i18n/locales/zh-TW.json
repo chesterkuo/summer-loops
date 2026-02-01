@@ -587,5 +587,73 @@
         "developer": "開發者"
       }
     }
+  },
+  "relationshipCoach": {
+    "title": "關係教練",
+    "attentionCount": "{{count}} 位聯絡人需要關注",
+    "refresh": "重新分析",
+    "urgent": "緊急",
+    "due": "到期",
+    "maintain": "維護",
+    "healthy": "健康"
+  },
+  "meeting": {
+    "prepMeeting": "會議準備",
+    "logMeeting": "記錄會議",
+    "briefTitle": "會議摘要",
+    "logMeetingTitle": "記錄會議",
+    "generatingBrief": "正在生成摘要...",
+    "summary": "總結",
+    "talkingPoints": "談話要點",
+    "relationshipContext": "關係背景",
+    "lastInteraction": "上次互動",
+    "mutualConnections": "共同聯繫人",
+    "noBrief": "生成摘要失敗。",
+    "logDescription": "描述會議內容。AI 將提取筆記、行動項目和後續追蹤。",
+    "logPlaceholder": "喝了咖啡，討論了新專案。需要在週五前發送提案。",
+    "processWithAI": "AI 處理",
+    "interactionCreated": "互動已記錄",
+    "actionItems": "行動項目",
+    "reminderCreated": "已建立提醒"
+  },
+  "smartReminders": {
+    "title": "AI 建議",
+    "refresh": "重新整理",
+    "accept": "接受",
+    "dismiss": "忽略"
+  },
+  "messaging": {
+    "integrations": "通訊整合",
+    "connected": "已連接",
+    "notConnected": "未連接",
+    "connect": "連接",
+    "disconnect": "中斷連接",
+    "connectTitle": "連接 {{platform}}",
+    "linkInstructions": "開啟 {{platform}} 並向 Warmly 機器人發送此代碼：",
+    "waitingForLink": "等待連接中...此視窗將自動關閉。",
+    "hint": "連接通訊應用程式，透過向機器人發送名片或描述來新增聯絡人。",
+    "line": {
+      "step1AddBot": "掃描 QR 碼以在 LINE 上加入 Warmly 機器人：",
+      "step2SendCode": "將此代碼發送給 Warmly 機器人："
+    },
+    "whatsapp": {
+      "connectWhatsApp": "連接 WhatsApp",
+      "disconnectWhatsApp": "斷開連接",
+      "enterPhone": "輸入含國碼的手機號碼（如：886912345678）：",
+      "getPairingCode": "取得配對碼",
+      "pairingCode": "配對碼",
+      "pairingInstructions": "開啟 WhatsApp → 已連結的裝置 → 連結裝置 → 以電話號碼連結，然後輸入此代碼：",
+      "connecting": "連接中...",
+      "connected": "已連接",
+      "disconnected": "未連接",
+      "importContacts": "匯入",
+      "selectContactsToImport": "選擇要匯入的聯絡人",
+      "importSelected": "匯入 {{count}} 個聯絡人",
+      "importSuccess": "聯絡人匯入成功",
+      "noContactsFound": "未找到新聯絡人。請在同步完成後重試。",
+      "connectionLost": "連線中斷",
+      "reconnecting": "正在重新連接...",
+      "rateLimitWarning": "WhatsApp 限制配對嘗試次數。如果您的配對碼被拒絕，請等待 15–30 分鐘後再試。"
+    }
   }
 }

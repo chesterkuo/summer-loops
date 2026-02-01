@@ -324,5 +324,73 @@
     "passwordsDoNotMatch": "Mật khẩu không khớp",
     "resetPasswordButton": "Đặt lại mật khẩu",
     "passwordResetSuccess": "Đặt lại mật khẩu thành công. Bạn có thể đăng nhập ngay."
+  },
+  "relationshipCoach": {
+    "title": "Huấn luyện quan hệ",
+    "attentionCount": "{{count}} liên hệ cần chú ý",
+    "refresh": "Làm mới phân tích",
+    "urgent": "Khẩn cấp",
+    "due": "Đến hạn",
+    "maintain": "Duy trì",
+    "healthy": "Tốt"
+  },
+  "meeting": {
+    "prepMeeting": "Chuẩn bị cuộc họp",
+    "logMeeting": "Ghi nhận cuộc họp",
+    "briefTitle": "Tóm tắt cuộc họp",
+    "logMeetingTitle": "Ghi nhận cuộc họp",
+    "generatingBrief": "Đang tạo tóm tắt...",
+    "summary": "Tóm tắt",
+    "talkingPoints": "Điểm thảo luận",
+    "relationshipContext": "Bối cảnh quan hệ",
+    "lastInteraction": "Tương tác gần nhất",
+    "mutualConnections": "Liên hệ chung",
+    "noBrief": "Không thể tạo tóm tắt.",
+    "logDescription": "Mô tả cuộc họp. AI sẽ trích xuất ghi chú, hành động và theo dõi.",
+    "logPlaceholder": "Uống cà phê, thảo luận dự án mới. Cần gửi đề xuất trước thứ Sáu.",
+    "processWithAI": "Xử lý bằng AI",
+    "interactionCreated": "Đã ghi nhận tương tác",
+    "actionItems": "Hành động cần làm",
+    "reminderCreated": "Đã tạo nhắc nhở"
+  },
+  "smartReminders": {
+    "title": "Gợi ý AI",
+    "refresh": "Làm mới",
+    "accept": "Chấp nhận",
+    "dismiss": "Bỏ qua"
+  },
+  "messaging": {
+    "integrations": "Tích hợp tin nhắn",
+    "connected": "Đã kết nối",
+    "notConnected": "Chưa kết nối",
+    "connect": "Kết nối",
+    "disconnect": "Ngắt kết nối",
+    "connectTitle": "Kết nối {{platform}}",
+    "linkInstructions": "Mở {{platform}} và gửi mã này đến bot Warmly:",
+    "waitingForLink": "Đang chờ kết nối... Cửa sổ này sẽ tự động đóng.",
+    "hint": "Kết nối ứng dụng nhắn tin để thêm liên hệ bằng cách gửi danh thiếp hoặc mô tả cho bot.",
+    "line": {
+      "step1AddBot": "Quét mã QR để thêm bot Warmly trên LINE:",
+      "step2SendCode": "Gửi mã này cho bot Warmly:"
+    },
+    "whatsapp": {
+      "connectWhatsApp": "Kết nối WhatsApp",
+      "disconnectWhatsApp": "Ngắt kết nối",
+      "enterPhone": "Nhập số điện thoại kèm mã quốc gia (VD: 84901234567):",
+      "getPairingCode": "Lấy Mã Ghép Nối",
+      "pairingCode": "Mã Ghép Nối",
+      "pairingInstructions": "Mở WhatsApp → Thiết bị liên kết → Liên kết thiết bị → Liên kết bằng số điện thoại, sau đó nhập mã này:",
+      "connecting": "Đang kết nối...",
+      "connected": "Đã kết nối",
+      "disconnected": "Chưa kết nối",
+      "importContacts": "Nhập",
+      "selectContactsToImport": "Chọn Danh Bạ để Nhập",
+      "importSelected": "Nhập {{count}} Liên Hệ",
+      "importSuccess": "Nhập danh bạ thành công",
+      "noContactsFound": "Không tìm thấy danh bạ mới. Thử đồng bộ lại.",
+      "connectionLost": "Mất kết nối",
+      "reconnecting": "Đang kết nối lại...",
+      "rateLimitWarning": "WhatsApp giới hạn số lần ghép nối. Nếu mã bị từ chối, vui lòng đợi 15–30 phút trước khi thử lại."
+    }
   }
 }

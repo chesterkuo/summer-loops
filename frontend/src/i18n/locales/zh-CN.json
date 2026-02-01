@@ -587,5 +587,73 @@
         "developer": "开发者"
       }
     }
+  },
+  "relationshipCoach": {
+    "title": "关系教练",
+    "attentionCount": "{{count}} 位联系人需要关注",
+    "refresh": "重新分析",
+    "urgent": "紧急",
+    "due": "到期",
+    "maintain": "维护",
+    "healthy": "健康"
+  },
+  "meeting": {
+    "prepMeeting": "会议准备",
+    "logMeeting": "记录会议",
+    "briefTitle": "会议摘要",
+    "logMeetingTitle": "记录会议",
+    "generatingBrief": "正在生成摘要...",
+    "summary": "总结",
+    "talkingPoints": "谈话要点",
+    "relationshipContext": "关系背景",
+    "lastInteraction": "上次互动",
+    "mutualConnections": "共同联系人",
+    "noBrief": "生成摘要失败。",
+    "logDescription": "描述会议内容。AI 将提取笔记、行动项目和后续跟进。",
+    "logPlaceholder": "喝了咖啡，讨论了新项目。需要在周五前发送提案。",
+    "processWithAI": "AI 处理",
+    "interactionCreated": "互动已记录",
+    "actionItems": "行动项目",
+    "reminderCreated": "已创建提醒"
+  },
+  "smartReminders": {
+    "title": "AI 建议",
+    "refresh": "刷新",
+    "accept": "接受",
+    "dismiss": "忽略"
+  },
+  "messaging": {
+    "integrations": "消息集成",
+    "connected": "已连接",
+    "notConnected": "未连接",
+    "connect": "连接",
+    "disconnect": "断开连接",
+    "connectTitle": "连接 {{platform}}",
+    "linkInstructions": "打开 {{platform}} 并向 Warmly 机器人发送此代码：",
+    "waitingForLink": "等待连接中...此窗口将自动关闭。",
+    "hint": "连接消息应用，通过向机器人发送名片或描述来添加联系人。",
+    "line": {
+      "step1AddBot": "扫描二维码在 LINE 上添加 Warmly 机器人：",
+      "step2SendCode": "将此代码发送给 Warmly 机器人："
+    },
+    "whatsapp": {
+      "connectWhatsApp": "连接 WhatsApp",
+      "disconnectWhatsApp": "断开连接",
+      "enterPhone": "输入带国家代码的手机号（如：8613812345678）：",
+      "getPairingCode": "获取配对码",
+      "pairingCode": "配对码",
+      "pairingInstructions": "打开 WhatsApp → 关联设备 → 关联新设备 → 用手机号关联，然后输入此代码：",
+      "connecting": "连接中...",
+      "connected": "已连接",
+      "disconnected": "未连接",
+      "importContacts": "导入",
+      "selectContactsToImport": "选择要导入的联系人",
+      "importSelected": "导入 {{count}} 个联系人",
+      "importSuccess": "联系人导入成功",
+      "noContactsFound": "未找到新联系人。请在同步完成后重试。",
+      "connectionLost": "连接断开",
+      "reconnecting": "正在重新连接...",
+      "rateLimitWarning": "WhatsApp 限制配对尝试次数。如果您的配对码被拒绝，请等待 15–30 分钟后再试。"
+    }
   }
 }

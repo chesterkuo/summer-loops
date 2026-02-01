@@ -7,7 +7,7 @@ import { useContactStore } from '../stores/contactStore';
 import { useLocaleStore } from '../stores/localeStore';
 import { useNotificationStore } from '../stores/notificationStore';
 import { useAuthStore } from '../stores/authStore';
-import { relationshipsApi, interactionsApi, aiApi, Relationship, Interaction, Contact } from '../services/api';
+import { relationshipsApi, interactionsApi, aiApi, messagingApi, Relationship, Interaction, Contact } from '../services/api';
 
 interface ProfileProps {
   onNavigate: (screen: ScreenName) => void;
@@ -34,6 +34,34 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
   const [isSavingBio, setIsSavingBio] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
+  // Meeting Prep state
+  const [showMeetingBrief, setShowMeetingBrief] = useState(false);
+  const [meetingBrief, setMeetingBrief] = useState<any>(null);
+  const [isLoadingBrief, setIsLoadingBrief] = useState(false);
+  const [showMeetingFollowUp, setShowMeetingFollowUp] = useState(false);
+  const [meetingNoteText, setMeetingNoteText] = useState('');
+  const [meetingFollowUpResult, setMeetingFollowUpResult] = useState<any>(null);
+  const [isProcessingFollowUp, setIsProcessingFollowUp] = useState(false);
+
+  // Messaging Integrations state
+  const [messagingAccounts, setMessagingAccounts] = useState<any[]>([]);
+  const [showLinkingModal, setShowLinkingModal] = useState(false);
+  const [linkingPlatform, setLinkingPlatform] = useState<'line'>('line');
+  const [linkingToken, setLinkingToken] = useState('');
+  const [linkingCountdown, setLinkingCountdown] = useState(0);
+
+  // WhatsApp Baileys state
+  const [waStatus, setWaStatus] = useState<{ status: string; phoneNumber: string | null }>({ status: 'disconnected', phoneNumber: null });
+  const [showWaConnectModal, setShowWaConnectModal] = useState(false);
+  const [waPhoneInput, setWaPhoneInput] = useState('');
+  const [waPairingCode, setWaPairingCode] = useState('');
+  const [isWaConnecting, setIsWaConnecting] = useState(false);
+  const [waCountdown, setWaCountdown] = useState(0);
+  const [showWaImportModal, setShowWaImportModal] = useState(false);
+  const [waContacts, setWaContacts] = useState<any[]>([]);
+  const [waSelectedIds, setWaSelectedIds] = useState<Set<string>>(new Set());
+  const [isWaImporting, setIsWaImporting] = useState(false);
 
   // Edit contact state
   const [showEditContactModal, setShowEditContactModal] = useState(false);
@@ -86,6 +114,155 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
       }
     }
     setIsGeneratingSummary(false);
+  };
+
+  // Fetch messaging accounts on user profile
+  useEffect(() => {
+    if (!selectedContact) {
+      messagingApi.listAccounts().then(res => {
+        if (res.data) setMessagingAccounts(res.data);
+      });
+      messagingApi.whatsappStatus().then(res => {
+        if (res.data) setWaStatus({ status: res.data.status, phoneNumber: res.data.phoneNumber });
+      });
+    }
+  }, [selectedContact]);
+
+  // LINE Linking modal countdown
+  useEffect(() => {
+    if (!showLinkingModal || linkingCountdown <= 0) return;
+    const timer = setInterval(() => {
+      setLinkingCountdown(prev => {
+        if (prev <= 1) { clearInterval(timer); setShowLinkingModal(false); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [showLinkingModal, linkingCountdown]);
+
+  // LINE Linking modal polling (separate from countdown to avoid restart each tick)
+  useEffect(() => {
+    if (!showLinkingModal) return;
+    const poller = setInterval(async () => {
+      const res = await messagingApi.checkLinkStatus(linkingPlatform);
+      if (res.data?.linked) {
+        clearInterval(poller);
+        setShowLinkingModal(false);
+        setLinkingCountdown(0);
+        const accts = await messagingApi.listAccounts();
+        if (accts.data) setMessagingAccounts(accts.data);
+      }
+    }, 3000);
+    return () => clearInterval(poller);
+  }, [showLinkingModal, linkingPlatform]);
+
+  // WhatsApp pairing code countdown + polling
+  useEffect(() => {
+    if (!showWaConnectModal || waCountdown <= 0 || !waPairingCode) return;
+    const timer = setInterval(() => {
+      setWaCountdown(prev => {
+        if (prev <= 1) { clearInterval(timer); setShowWaConnectModal(false); setWaPairingCode(''); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+    const poller = setInterval(async () => {
+      const res = await messagingApi.whatsappStatus();
+      if (res.data?.status === 'connected') {
+        clearInterval(poller);
+        clearInterval(timer);
+        setShowWaConnectModal(false);
+        setWaPairingCode('');
+        setWaStatus({ status: 'connected', phoneNumber: res.data.phoneNumber });
+      }
+    }, 3000);
+    return () => { clearInterval(timer); clearInterval(poller); };
+  }, [showWaConnectModal, waCountdown, waPairingCode]);
+
+  // Continue polling WhatsApp status while connecting (even if modal closed)
+  useEffect(() => {
+    if (waStatus.status !== 'connecting') return;
+    const poller = setInterval(async () => {
+      const res = await messagingApi.whatsappStatus();
+      if (res.data?.status === 'connected') {
+        clearInterval(poller);
+        setWaStatus({ status: 'connected', phoneNumber: res.data.phoneNumber });
+      } else if (res.data?.status === 'disconnected' || res.data?.status === 'logged_out') {
+        clearInterval(poller);
+        setWaStatus({ status: res.data.status, phoneNumber: null });
+      }
+    }, 5000);
+    return () => clearInterval(poller);
+  }, [waStatus.status]);
+
+  const handleGenerateBrief = async () => {
+    if (!selectedContact?.id) return;
+    setIsLoadingBrief(true);
+    setShowMeetingBrief(true);
+    const res = await aiApi.generateMeetingBrief(selectedContact.id, currentLocale);
+    if (res.data) setMeetingBrief(res.data);
+    setIsLoadingBrief(false);
+  };
+
+  const handleProcessFollowUp = async () => {
+    if (!selectedContact?.id || !meetingNoteText.trim()) return;
+    setIsProcessingFollowUp(true);
+    const res = await aiApi.processMeetingFollowUp(selectedContact.id, meetingNoteText, currentLocale);
+    if (res.data) {
+      setMeetingFollowUpResult(res.data);
+      // Refresh interactions
+      const intRes = await interactionsApi.list({ contactId: selectedContact.id, limit: 20 });
+      if (intRes.data) setInteractions(intRes.data);
+    }
+    setIsProcessingFollowUp(false);
+  };
+
+  const handleConnectLine = async () => {
+    setLinkingPlatform('line');
+    const res = await messagingApi.generateToken('line');
+    if (res.data) {
+      setLinkingToken(res.data.token);
+      setLinkingCountdown(res.data.expiresInSeconds);
+      setShowLinkingModal(true);
+    }
+  };
+
+  const handleConnectWhatsApp = async () => {
+    if (!waPhoneInput.trim()) return;
+    setIsWaConnecting(true);
+    const res = await messagingApi.whatsappConnect(waPhoneInput.trim());
+    setIsWaConnecting(false);
+    if (res.data?.pairingCode) {
+      setWaPairingCode(res.data.pairingCode);
+      setWaCountdown(180);
+      setWaStatus({ status: 'connecting', phoneNumber: waPhoneInput.trim() });
+    }
+  };
+
+  const handleDisconnectWhatsApp = async () => {
+    await messagingApi.whatsappDisconnect();
+    setWaStatus({ status: 'disconnected', phoneNumber: null });
+  };
+
+  const handleWaImport = async () => {
+    const res = await messagingApi.whatsappContacts();
+    if (res.data) {
+      setWaContacts(res.data);
+      setWaSelectedIds(new Set());
+      setShowWaImportModal(true);
+    }
+  };
+
+  const handleWaImportSelected = async () => {
+    if (waSelectedIds.size === 0) return;
+    setIsWaImporting(true);
+    const res = await messagingApi.whatsappImportContacts(Array.from(waSelectedIds));
+    setIsWaImporting(false);
+    if (res.data) {
+      setShowWaImportModal(false);
+      // Refresh contacts list
+      const freshContacts = await messagingApi.whatsappContacts();
+      if (freshContacts.data) setWaContacts(freshContacts.data);
+    }
   };
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -610,6 +787,333 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
         </div>
       )}
 
+      {/* Meeting Brief Modal */}
+      {showMeetingBrief && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-[#2C3435] w-full max-w-md rounded-2xl p-5 border border-white/10 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <span className="material-symbols-outlined text-blue-400">description</span>
+                {t('meeting.briefTitle', 'Meeting Brief')}
+              </h3>
+              <button onClick={() => setShowMeetingBrief(false)} className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-white/10">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            {isLoadingBrief ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-3">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
+                <p className="text-sm text-gray-400">{t('meeting.generatingBrief', 'Generating brief...')}</p>
+              </div>
+            ) : meetingBrief ? (
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{t('meeting.summary', 'Summary')}</h4>
+                  <p className="text-sm text-gray-200 leading-relaxed">{meetingBrief.summary}</p>
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{t('meeting.talkingPoints', 'Talking Points')}</h4>
+                  <ul className="space-y-2">
+                    {meetingBrief.talkingPoints?.map((point: string, i: number) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-gray-200">
+                        <span className="text-primary mt-0.5">•</span>
+                        <span>{point}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{t('meeting.relationshipContext', 'Relationship Context')}</h4>
+                  <p className="text-sm text-gray-300">{meetingBrief.relationshipContext}</p>
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{t('meeting.lastInteraction', 'Last Interaction')}</h4>
+                  <p className="text-sm text-gray-300">{meetingBrief.lastInteractionRecap}</p>
+                </div>
+                {meetingBrief.mutualConnections && meetingBrief.mutualConnections !== 'None found' && (
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{t('meeting.mutualConnections', 'Mutual Connections')}</h4>
+                    <p className="text-sm text-gray-300">{meetingBrief.mutualConnections}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-gray-400 text-sm py-4">{t('meeting.noBrief', 'Failed to generate brief.')}</p>
+            )}
+            <button onClick={() => setShowMeetingBrief(false)} className="mt-4 w-full py-3 rounded-xl bg-gray-700 hover:bg-gray-600 text-white font-bold text-sm transition-colors">
+              {t('common.close', 'Close')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Meeting Follow-Up Modal */}
+      {showMeetingFollowUp && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-[#2C3435] w-full max-w-md rounded-2xl p-5 border border-white/10 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <span className="material-symbols-outlined text-purple-400">post_add</span>
+                {t('meeting.logMeetingTitle', 'Log Meeting')}
+              </h3>
+              <button onClick={() => setShowMeetingFollowUp(false)} className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-white/10">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            {!meetingFollowUpResult ? (
+              <>
+                <p className="text-xs text-gray-400 mb-3">{t('meeting.logDescription', 'Describe what happened in the meeting. AI will extract notes, action items, and follow-up reminders.')}</p>
+                <textarea
+                  value={meetingNoteText}
+                  onChange={(e) => setMeetingNoteText(e.target.value)}
+                  placeholder={t('meeting.logPlaceholder', 'Had coffee, discussed the new project. Need to send proposal by Friday. Follow up in 2 weeks.')}
+                  className="w-full bg-black/20 border border-gray-700 rounded-xl p-4 text-white text-sm focus:border-purple-400 outline-none h-32 resize-none mb-4 placeholder:text-gray-500 transition-colors"
+                  autoFocus
+                />
+                <div className="flex gap-3">
+                  <button onClick={() => setShowMeetingFollowUp(false)} className="flex-1 py-3 rounded-xl bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold transition-colors">
+                    {t('common.cancel')}
+                  </button>
+                  <button
+                    onClick={handleProcessFollowUp}
+                    disabled={isProcessingFollowUp || !meetingNoteText.trim()}
+                    className="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {isProcessingFollowUp ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    ) : (
+                      <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
+                    )}
+                    {t('meeting.processWithAI', 'Process with AI')}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-3 rounded-xl bg-green-900/20 border border-green-800/30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="material-symbols-outlined text-green-400 text-[18px]">check_circle</span>
+                    <span className="text-sm font-bold text-green-400">{t('meeting.interactionCreated', 'Interaction Logged')}</span>
+                  </div>
+                  <p className="text-xs text-gray-300">{meetingFollowUpResult.cleanedNotes}</p>
+                </div>
+                {meetingFollowUpResult.actionItems?.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{t('meeting.actionItems', 'Action Items')}</h4>
+                    {meetingFollowUpResult.actionItems.map((item: any, i: number) => (
+                      <div key={i} className="flex items-start gap-2 text-sm text-gray-200 mb-1.5">
+                        <span className="material-symbols-outlined text-yellow-400 text-[16px] mt-0.5">task_alt</span>
+                        <span>{item.task}{item.dueDate ? ` (${item.dueDate})` : ''}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {meetingFollowUpResult.createdReminder && (
+                  <div className="p-3 rounded-xl bg-blue-900/20 border border-blue-800/30">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-blue-400 text-[16px]">alarm</span>
+                      <span className="text-sm text-blue-300">{t('meeting.reminderCreated', 'Reminder created')}: {meetingFollowUpResult.createdReminder.note}</span>
+                    </div>
+                  </div>
+                )}
+                <button onClick={() => setShowMeetingFollowUp(false)} className="w-full py-3 rounded-xl bg-gray-700 hover:bg-gray-600 text-white font-bold text-sm transition-colors">
+                  {t('common.close', 'Close')}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* LINE Linking Token Modal */}
+      {showLinkingModal && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-[#2C3435] w-full max-w-sm rounded-2xl p-6 border border-white/10 shadow-2xl text-center">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <span className="material-symbols-outlined" style={{ color: '#00B900' }}>chat</span>
+                {t('messaging.connectTitle', { platform: 'LINE', defaultValue: 'Connect {{platform}}' })}
+              </h3>
+              <button onClick={() => setShowLinkingModal(false)} className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-white/10">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {/* Step 1: Add bot */}
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="w-6 h-6 rounded-full bg-[#00B900] text-white text-xs font-bold flex items-center justify-center shrink-0">1</span>
+                <p className="text-sm text-gray-300 text-left">
+                  {t('messaging.line.step1AddBot', 'Scan QR code to add Warmly bot on LINE:')}
+                </p>
+              </div>
+              <div className="bg-white rounded-xl p-3 inline-block mb-2">
+                <img src="/WarmlyBot_QR.png" alt="Warmly LINE Bot QR" className="w-36 h-36" />
+              </div>
+            </div>
+
+            {/* Step 2: Send code */}
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="w-6 h-6 rounded-full bg-[#00B900] text-white text-xs font-bold flex items-center justify-center shrink-0">2</span>
+                <p className="text-sm text-gray-300 text-left">
+                  {t('messaging.line.step2SendCode', 'Send this code to the Warmly bot:')}
+                </p>
+              </div>
+              <div className="text-4xl font-mono font-black text-white tracking-[0.3em] bg-black/30 rounded-2xl py-5 mb-3 border border-white/10">
+                {linkingToken}
+              </div>
+              <div className="flex items-center justify-center gap-2 text-sm">
+                <span className="material-symbols-outlined text-yellow-400 text-[18px]">timer</span>
+                <span className="text-yellow-400 font-medium">
+                  {Math.floor(linkingCountdown / 60)}:{String(linkingCountdown % 60).padStart(2, '0')}
+                </span>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-500">
+              {t('messaging.waitingForLink', 'Waiting for connection... This modal will close automatically.')}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* WhatsApp Connect Modal */}
+      {showWaConnectModal && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-[#2C3435] w-full max-w-sm rounded-2xl p-6 border border-white/10 shadow-2xl text-center">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <span className="material-symbols-outlined" style={{ color: '#25D366' }}>chat</span>
+                {t('messaging.whatsapp.connectWhatsApp', 'Connect WhatsApp')}
+              </h3>
+              <button onClick={() => { setShowWaConnectModal(false); setWaPairingCode(''); }} className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-white/10">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            {!waPairingCode ? (
+              <div className="mb-4">
+                <div className="flex items-start gap-2 bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-3 py-2.5 mb-4">
+                  <span className="material-symbols-outlined text-yellow-400 text-[18px] mt-0.5 shrink-0">warning</span>
+                  <p className="text-xs text-yellow-400/90 text-left">
+                    {t('messaging.whatsapp.rateLimitWarning', 'WhatsApp limits pairing attempts. If your code is rejected, please wait 15–30 minutes before trying again.')}
+                  </p>
+                </div>
+                <p className="text-sm text-gray-400 mb-4">
+                  {t('messaging.whatsapp.enterPhone', 'Enter your phone number with country code (e.g. 14155551234):')}
+                </p>
+                <input
+                  type="tel"
+                  value={waPhoneInput}
+                  onChange={(e) => setWaPhoneInput(e.target.value)}
+                  placeholder="14155551234"
+                  className="w-full p-3 rounded-xl bg-black/30 border border-white/10 text-white text-center text-lg font-mono mb-4 outline-none focus:border-[#25D366]/50"
+                />
+                <button
+                  onClick={handleConnectWhatsApp}
+                  disabled={isWaConnecting || !waPhoneInput.trim()}
+                  className="w-full py-3 rounded-xl bg-[#25D366] hover:bg-[#25D366]/80 text-white font-bold text-sm transition-colors disabled:opacity-50"
+                >
+                  {isWaConnecting ? t('messaging.whatsapp.connecting', 'Connecting...') : t('messaging.whatsapp.getPairingCode', 'Get Pairing Code')}
+                </button>
+              </div>
+            ) : (
+              <div className="mb-4">
+                <p className="text-sm text-gray-400 mb-4">
+                  {t('messaging.whatsapp.pairingInstructions', 'Open WhatsApp → Linked Devices → Link a Device → Link with Phone Number, then enter this code:')}
+                </p>
+                <div className="text-4xl font-mono font-black text-white tracking-[0.3em] bg-black/30 rounded-2xl py-6 mb-4 border border-white/10">
+                  {waPairingCode}
+                </div>
+                <div className="flex items-center justify-center gap-2 text-sm mb-2">
+                  <span className="material-symbols-outlined text-yellow-400 text-[18px]">timer</span>
+                  <span className="text-yellow-400 font-medium">
+                    {Math.floor(waCountdown / 60)}:{String(waCountdown % 60).padStart(2, '0')}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500">
+                  {t('messaging.waitingForLink', 'Waiting for connection... This modal will close automatically.')}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* WhatsApp Import Contacts Modal */}
+      {showWaImportModal && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-[#2C3435] w-full max-w-md rounded-2xl p-6 border border-white/10 shadow-2xl max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-white">
+                {t('messaging.whatsapp.selectContactsToImport', 'Select Contacts to Import')}
+              </h3>
+              <button onClick={() => setShowWaImportModal(false)} className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-white/10">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            {waContacts.filter(c => c.status === 'pending').length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">
+                {t('messaging.whatsapp.noContactsFound', 'No new contacts found. Try syncing again after WhatsApp finishes loading your contacts.')}
+              </p>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs text-gray-400">
+                    {waSelectedIds.size} {t('common.selected', 'selected')}
+                  </span>
+                  <button
+                    onClick={() => {
+                      const pending = waContacts.filter(c => c.status === 'pending');
+                      if (waSelectedIds.size === pending.length) {
+                        setWaSelectedIds(new Set());
+                      } else {
+                        setWaSelectedIds(new Set(pending.map(c => c.id)));
+                      }
+                    }}
+                    className="text-xs text-[#25D366] font-bold"
+                  >
+                    {waSelectedIds.size === waContacts.filter(c => c.status === 'pending').length ? t('common.deselectAll', 'Deselect All') : t('common.selectAll', 'Select All')}
+                  </button>
+                </div>
+                <div className="overflow-y-auto flex-1 space-y-1 mb-4">
+                  {waContacts.filter(c => c.status === 'pending').map(contact => (
+                    <label key={contact.id} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={waSelectedIds.has(contact.id)}
+                        onChange={() => {
+                          const next = new Set(waSelectedIds);
+                          if (next.has(contact.id)) next.delete(contact.id);
+                          else next.add(contact.id);
+                          setWaSelectedIds(next);
+                        }}
+                        className="accent-[#25D366] size-4"
+                      />
+                      <div>
+                        <p className="text-sm text-white">{contact.wa_name || contact.phone_number || contact.wa_jid}</p>
+                        {contact.phone_number && contact.wa_name && (
+                          <p className="text-xs text-gray-400">{contact.phone_number}</p>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                <button
+                  onClick={handleWaImportSelected}
+                  disabled={isWaImporting || waSelectedIds.size === 0}
+                  className="w-full py-3 rounded-xl bg-[#25D366] hover:bg-[#25D366]/80 text-white font-bold text-sm transition-colors disabled:opacity-50"
+                >
+                  {isWaImporting
+                    ? t('common.loading', 'Loading...')
+                    : t('messaging.whatsapp.importSelected', { count: waSelectedIds.size, defaultValue: `Import ${waSelectedIds.size} Contact(s)` })}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Quick Jump & Options Menu */}
       {showMenu && (
         <>
@@ -854,6 +1358,94 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
               </p>
             </div>
 
+            {/* Messaging Integrations */}
+            <div className="bg-surface-card p-5 rounded-2xl shadow-sm border border-white/5">
+              <h3 className="font-bold text-xs text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-[16px]">forum</span>
+                {t('messaging.integrations', 'Messaging Integrations')}
+              </h3>
+              <div className="space-y-3">
+                {/* LINE */}
+                {(() => {
+                  const lineAccount = messagingAccounts.find(a => a.platform === 'line' && a.is_active);
+                  return (
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5">
+                      <div className="flex items-center gap-3">
+                        <div className="size-10 rounded-lg bg-[#00B900]/20 flex items-center justify-center text-[#00B900] font-bold text-sm">LINE</div>
+                        <div>
+                          <p className="text-sm font-medium text-white">LINE</p>
+                          <p className="text-xs text-gray-400">
+                            {lineAccount ? `${t('messaging.connected', 'Connected')}${lineAccount.display_name ? ` — ${lineAccount.display_name}` : ''}` : t('messaging.notConnected', 'Not connected')}
+                          </p>
+                        </div>
+                      </div>
+                      {lineAccount ? (
+                        <button
+                          onClick={async () => { await messagingApi.disconnect(lineAccount.id); const res = await messagingApi.listAccounts(); if (res.data) setMessagingAccounts(res.data); }}
+                          className="px-3 py-1.5 rounded-lg bg-red-900/20 text-red-400 text-xs font-bold border border-red-800/30 hover:bg-red-900/30"
+                        >
+                          {t('messaging.disconnect', 'Disconnect')}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleConnectLine()}
+                          className="px-3 py-1.5 rounded-lg bg-[#00B900]/20 text-[#00B900] text-xs font-bold border border-[#00B900]/30 hover:bg-[#00B900]/30"
+                        >
+                          {t('messaging.connect', 'Connect')}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
+                {/* WhatsApp (Baileys) */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5">
+                  <div className="flex items-center gap-3">
+                    <div className="size-10 rounded-lg bg-[#25D366]/20 flex items-center justify-center text-[#25D366] font-bold text-xs">WA</div>
+                    <div>
+                      <p className="text-sm font-medium text-white">WhatsApp</p>
+                      <p className="text-xs text-gray-400">
+                        {waStatus.status === 'connected'
+                          ? `${t('messaging.whatsapp.connected', 'Connected')}${waStatus.phoneNumber ? ` — ${waStatus.phoneNumber}` : ''}`
+                          : waStatus.status === 'connecting'
+                          ? t('messaging.whatsapp.connecting', 'Connecting...')
+                          : t('messaging.whatsapp.disconnected', 'Not connected')}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    {waStatus.status === 'connected' && (
+                      <>
+                        <button
+                          onClick={handleWaImport}
+                          className="px-3 py-1.5 rounded-lg bg-[#25D366]/20 text-[#25D366] text-xs font-bold border border-[#25D366]/30 hover:bg-[#25D366]/30"
+                        >
+                          {t('messaging.whatsapp.importContacts', 'Import')}
+                        </button>
+                        <button
+                          onClick={handleDisconnectWhatsApp}
+                          className="px-3 py-1.5 rounded-lg bg-red-900/20 text-red-400 text-xs font-bold border border-red-800/30 hover:bg-red-900/30"
+                        >
+                          {t('messaging.whatsapp.disconnectWhatsApp', 'Disconnect')}
+                        </button>
+                      </>
+                    )}
+                    {waStatus.status !== 'connected' && (
+                      <button
+                        onClick={() => setShowWaConnectModal(true)}
+                        className="px-3 py-1.5 rounded-lg bg-[#25D366]/20 text-[#25D366] text-xs font-bold border border-[#25D366]/30 hover:bg-[#25D366]/30"
+                      >
+                        {t('messaging.whatsapp.connectWhatsApp', 'Connect')}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-3 flex items-start gap-1.5">
+                <span className="material-symbols-outlined text-[14px] mt-0.5">info</span>
+                {t('messaging.hint', 'Connect messaging apps to add contacts by sending business cards or descriptions to the bot.')}
+              </p>
+            </div>
+
             {/* Account Actions */}
             <div className="bg-surface-card p-5 rounded-2xl shadow-sm border border-white/5">
               <h3 className="font-bold text-xs text-gray-400 uppercase tracking-widest mb-4">{t('profile.account')}</h3>
@@ -1058,6 +1650,25 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
           <button onClick={() => openCreateModal(selectedContact?.id)} className="flex items-center justify-center gap-1.5 h-12 rounded-xl bg-[#2C3435] border border-gray-700 text-white font-bold text-sm hover:bg-gray-700 active:scale-[0.98] transition-all">
             <span className="material-symbols-outlined text-[20px]">alarm_add</span>
             {t('profile.setReminder')}
+          </button>
+        </div>
+
+        {/* Meeting Prep & Log */}
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={handleGenerateBrief}
+            disabled={isLoadingBrief}
+            className="flex items-center justify-center gap-1.5 h-12 rounded-xl bg-blue-600/20 border border-blue-500/30 text-blue-400 font-bold text-sm hover:bg-blue-600/30 active:scale-[0.98] transition-all disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-[20px]">description</span>
+            {t('meeting.prepMeeting', 'Prep Meeting')}
+          </button>
+          <button
+            onClick={() => { setShowMeetingFollowUp(true); setMeetingFollowUpResult(null); setMeetingNoteText(''); }}
+            className="flex items-center justify-center gap-1.5 h-12 rounded-xl bg-purple-600/20 border border-purple-500/30 text-purple-400 font-bold text-sm hover:bg-purple-600/30 active:scale-[0.98] transition-all"
+          >
+            <span className="material-symbols-outlined text-[20px]">post_add</span>
+            {t('meeting.logMeeting', 'Log Meeting')}
           </button>
         </div>
 

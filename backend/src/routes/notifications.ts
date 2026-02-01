@@ -63,12 +63,12 @@ notifications.get('/', async (c) => {
   `
   const done = doneRows.map(mapNotification)
 
-  return c.json({
+  return c.json({ data: {
     pending,
     upcoming,
     done,
     activeCount: pending.length
-  })
+  }})
 })
 
 // Get single notification

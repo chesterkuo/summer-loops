@@ -324,5 +324,73 @@
     "passwordsDoNotMatch": "パスワードが一致しません",
     "resetPasswordButton": "パスワードをリセット",
     "passwordResetSuccess": "パスワードがリセットされました。ログインできます。"
+  },
+  "relationshipCoach": {
+    "title": "関係コーチ",
+    "attentionCount": "{{count}} 件の連絡先に注意が必要です",
+    "refresh": "分析を更新",
+    "urgent": "緊急",
+    "due": "期限",
+    "maintain": "維持",
+    "healthy": "良好"
+  },
+  "meeting": {
+    "prepMeeting": "会議準備",
+    "logMeeting": "会議記録",
+    "briefTitle": "会議ブリーフ",
+    "logMeetingTitle": "会議記録",
+    "generatingBrief": "ブリーフを生成中...",
+    "summary": "概要",
+    "talkingPoints": "話題ポイント",
+    "relationshipContext": "関係の背景",
+    "lastInteraction": "前回のやり取り",
+    "mutualConnections": "共通の連絡先",
+    "noBrief": "ブリーフの生成に失敗しました。",
+    "logDescription": "会議の内容を記述してください。AIがメモ、アクション項目、フォローアップを抽出します。",
+    "logPlaceholder": "コーヒーを飲みながら新プロジェクトについて話しました。金曜日までに提案書を送る必要があります。",
+    "processWithAI": "AIで処理",
+    "interactionCreated": "やり取りを記録しました",
+    "actionItems": "アクション項目",
+    "reminderCreated": "リマインダーを作成しました"
+  },
+  "smartReminders": {
+    "title": "AI提案",
+    "refresh": "更新",
+    "accept": "承認",
+    "dismiss": "却下"
+  },
+  "messaging": {
+    "integrations": "メッセージ連携",
+    "connected": "接続済み",
+    "notConnected": "未接続",
+    "connect": "接続",
+    "disconnect": "切断",
+    "connectTitle": "{{platform}} を接続",
+    "linkInstructions": "{{platform}} を開き、Warmlyボットにこのコードを送信してください：",
+    "waitingForLink": "接続を待っています...このモーダルは自動的に閉じます。",
+    "hint": "メッセージアプリを接続して、ボットに名刺や説明を送信して連絡先を追加できます。",
+    "line": {
+      "step1AddBot": "QRコードをスキャンしてLINEでWarmlyボットを追加：",
+      "step2SendCode": "このコードをWarmlyボットに送信："
+    },
+    "whatsapp": {
+      "connectWhatsApp": "WhatsAppを接続",
+      "disconnectWhatsApp": "切断",
+      "enterPhone": "国番号付きの電話番号を入力してください（例：81901234567）：",
+      "getPairingCode": "ペアリングコードを取得",
+      "pairingCode": "ペアリングコード",
+      "pairingInstructions": "WhatsAppを開く → リンクされたデバイス → デバイスをリンク → 電話番号でリンク、このコードを入力：",
+      "connecting": "接続中...",
+      "connected": "接続済み",
+      "disconnected": "未接続",
+      "importContacts": "インポート",
+      "selectContactsToImport": "インポートする連絡先を選択",
+      "importSelected": "{{count}}件の連絡先をインポート",
+      "importSuccess": "連絡先のインポートに成功しました",
+      "noContactsFound": "新しい連絡先が見つかりません。同期完了後に再試行してください。",
+      "connectionLost": "接続が切断されました",
+      "reconnecting": "再接続中...",
+      "rateLimitWarning": "WhatsAppはペアリングの試行回数を制限しています。コードが拒否された場合は、15～30分待ってから再試行してください。"
+    }
   }
 }

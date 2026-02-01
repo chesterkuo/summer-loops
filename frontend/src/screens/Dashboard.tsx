@@ -7,7 +7,8 @@ import { ScreenName } from '../App';
 import { useAuthStore } from '../stores/authStore';
 import { useContactStore } from '../stores/contactStore';
 import { useNotificationStore } from '../stores/notificationStore';
-import { Contact } from '../services/api';
+import { Contact, aiApi } from '../services/api';
+import { useLocaleStore } from '../stores/localeStore';
 
 interface DashboardProps {
   onNavigate: (screen: ScreenName) => void;
@@ -18,8 +19,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [showAllOpportunities, setShowAllOpportunities] = useState(false);
   const [noteText, setNoteText] = useState('');
+  const [coachData, setCoachData] = useState<{ urgent: any[]; due: any[]; maintain: any[]; healthy: any[] } | null>(null);
+  const [isLoadingCoach, setIsLoadingCoach] = useState(false);
+  const [showCoachDetail, setShowCoachDetail] = useState(false);
 
   const { user } = useAuthStore();
+  const { currentLocale } = useLocaleStore();
   const { contacts, graphData, fetchContacts, fetchGraph, parseText, createContact, isLoading, setSelectedContact } = useContactStore();
   const { activeCount, openPanel, fetchNotifications } = useNotificationStore();
 
@@ -28,6 +33,22 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     fetchContacts();
     fetchGraph();
     fetchNotifications();
+    // Load relationship coach dashboard — run analysis if no data exists
+    aiApi.getRelationshipCoachDashboard().then(async (res) => {
+      if (res.data) {
+        const total = res.data.urgent.length + res.data.due.length + res.data.maintain.length + res.data.healthy.length;
+        if (total > 0) {
+          setCoachData(res.data);
+        } else {
+          // No data yet — run initial analysis
+          setIsLoadingCoach(true);
+          await aiApi.analyzeRelationshipHealth(currentLocale);
+          const fresh = await aiApi.getRelationshipCoachDashboard();
+          if (fresh.data) setCoachData(fresh.data);
+          setIsLoadingCoach(false);
+        }
+      }
+    });
   }, []);
 
   const handleSaveNote = async () => {
@@ -255,6 +276,80 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             </button>
           </div>
         </div>
+
+        {/* Relationship Coach Card */}
+        {(coachData !== null || isLoadingCoach) && (
+          <div className="px-6 py-2">
+            <div className="rounded-2xl bg-surface-card p-5 border border-white/5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-primary/20 rounded-lg">
+                    <span className="material-symbols-outlined text-primary text-[18px]">psychology</span>
+                  </div>
+                  <h3 className="font-bold text-white text-sm">{t('relationshipCoach.title', 'Relationship Coach')}</h3>
+                </div>
+                <button
+                  onClick={() => setShowCoachDetail(!showCoachDetail)}
+                  className="text-xs text-primary font-semibold hover:underline"
+                >
+                  {showCoachDetail ? t('common.close', 'Close') : t('dashboard.viewAll', 'View All')}
+                </button>
+              </div>
+              {isLoadingCoach ? (
+                <div className="flex items-center justify-center py-6">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                </div>
+              ) : coachData && (coachData.urgent.length > 0 || coachData.due.length > 0) ? (
+                <>
+                  <p className="text-xs text-text-muted mb-3">
+                    {t('relationshipCoach.attentionCount', { count: coachData.urgent.length + coachData.due.length, defaultValue: '{{count}} contacts need attention' })}
+                  </p>
+                  <div className="space-y-3">
+                    {[...coachData.urgent, ...coachData.due].slice(0, showCoachDetail ? 10 : 3).map((item: any) => (
+                      <div
+                        key={item.contact_id}
+                        onClick={() => {
+                          const contact = contacts.find(c => c.id === item.contact_id);
+                          if (contact) { setSelectedContact(contact); onNavigate('profile'); }
+                        }}
+                        className="flex items-start gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 cursor-pointer transition-colors"
+                      >
+                        <div className={`mt-0.5 size-2 rounded-full shrink-0 ${item.priority === 'urgent' ? 'bg-red-400' : 'bg-yellow-400'}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-white truncate">{item.name}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{item.suggested_action}</p>
+                        </div>
+                        <span className="material-symbols-outlined text-gray-500 text-[18px]">chevron_right</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-text-muted mb-3">
+                  {t('relationshipCoach.healthy', 'All contacts are healthy. Nice work!')}
+                </p>
+              )}
+              <button
+                onClick={async () => {
+                  setIsLoadingCoach(true);
+                  await aiApi.analyzeRelationshipHealth(currentLocale);
+                  const res = await aiApi.getRelationshipCoachDashboard();
+                  if (res.data) setCoachData(res.data);
+                  setIsLoadingCoach(false);
+                }}
+                disabled={isLoadingCoach}
+                className="mt-3 w-full py-2.5 rounded-xl bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                {isLoadingCoach ? (
+                  <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-primary"></div>
+                ) : (
+                  <span className="material-symbols-outlined text-[16px]">refresh</span>
+                )}
+                {t('relationshipCoach.refresh', 'Refresh Analysis')}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Contacts List */}
         <div className="px-6 pt-2 pb-2 flex items-center justify-between">

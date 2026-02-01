@@ -498,6 +498,128 @@ export const aiApi = {
       lastInteraction: Interaction | null
     }>(`/ai/suggest-interaction/${contactId}`, { method: 'POST' })
   },
+
+  // v1.2 Relationship Coach
+  async analyzeRelationshipHealth(locale?: string) {
+    return apiFetch<{ analyzed: number; results: any[] }>('/ai/relationship-coach/analyze', {
+      method: 'POST',
+      headers: locale ? { 'X-User-Locale': locale } : {},
+    })
+  },
+
+  async getRelationshipCoachDashboard() {
+    return apiFetch<{ urgent: any[]; due: any[]; maintain: any[]; healthy: any[] }>(
+      '/ai/relationship-coach/dashboard'
+    )
+  },
+
+  // v1.2 Meeting Prep
+  async generateMeetingBrief(contactId: string, locale?: string) {
+    return apiFetch<{
+      summary: string
+      talkingPoints: string[]
+      relationshipContext: string
+      lastInteractionRecap: string
+      mutualConnections: string
+    }>(`/ai/meeting/brief/${contactId}`, {
+      method: 'POST',
+      headers: locale ? { 'X-User-Locale': locale } : {},
+    })
+  },
+
+  async processMeetingFollowUp(contactId: string, noteText: string, locale?: string) {
+    return apiFetch<{
+      cleanedNotes: string
+      actionItems: { task: string; dueDate?: string }[]
+      interactionType: string
+      followUpSuggestion: { note: string; daysFromNow: number } | null
+      createdInteraction: any
+      createdReminder: any
+    }>(`/ai/meeting/follow-up/${contactId}`, {
+      method: 'POST',
+      body: JSON.stringify({ noteText }),
+      headers: locale ? { 'X-User-Locale': locale } : {},
+    })
+  },
+
+  // v1.2 Smart Reminders
+  async analyzeSmartReminders(locale?: string) {
+    return apiFetch<{ analyzed: number; suggestions: any[] }>('/ai/smart-reminders/analyze', {
+      method: 'POST',
+      headers: locale ? { 'X-User-Locale': locale } : {},
+    })
+  },
+
+  async getSmartReminderSuggestions() {
+    return apiFetch<any[]>('/ai/smart-reminders/suggestions')
+  },
+
+  async acceptSmartReminder(id: string) {
+    return apiFetch<{ notificationId: string; suggestion: any }>(
+      `/ai/smart-reminders/accept/${id}`,
+      { method: 'POST' }
+    )
+  },
+
+  async dismissSmartReminder(id: string) {
+    return apiFetch<{ dismissed: boolean }>(
+      `/ai/smart-reminders/dismiss/${id}`,
+      { method: 'POST' }
+    )
+  },
+}
+
+// Messaging API (v1.2)
+export const messagingApi = {
+  async generateToken(platform: 'line') {
+    return apiFetch<{ token: string; expiresInSeconds: number }>('/messaging/generate-token', {
+      method: 'POST',
+      body: JSON.stringify({ platform }),
+    })
+  },
+
+  async listAccounts() {
+    return apiFetch<any[]>('/messaging/accounts')
+  },
+
+  async checkLinkStatus(platform: string) {
+    return apiFetch<{ linked: boolean; account: any }>(`/messaging/link-status/${platform}`)
+  },
+
+  async disconnect(accountId: string) {
+    return apiFetch<{ disconnected: boolean }>(`/messaging/accounts/${accountId}`, {
+      method: 'DELETE',
+    })
+  },
+
+  // WhatsApp Baileys
+  async whatsappConnect(phoneNumber: string) {
+    return apiFetch<{ pairingCode: string }>('/messaging/whatsapp/connect', {
+      method: 'POST',
+      body: JSON.stringify({ phoneNumber }),
+    })
+  },
+
+  async whatsappStatus() {
+    return apiFetch<{ status: string; phoneNumber: string | null; connectedAt: string | null; lastSyncAt: string | null }>('/messaging/whatsapp/status')
+  },
+
+  async whatsappDisconnect() {
+    return apiFetch<{ disconnected: boolean }>('/messaging/whatsapp/disconnect', {
+      method: 'POST',
+    })
+  },
+
+  async whatsappContacts() {
+    return apiFetch<any[]>('/messaging/whatsapp/contacts')
+  },
+
+  async whatsappImportContacts(contactIds: string[]) {
+    return apiFetch<{ importedCount: number }>('/messaging/whatsapp/import-contacts', {
+      method: 'POST',
+      body: JSON.stringify({ contactIds }),
+    })
+  },
 }
 
 // Notifications API

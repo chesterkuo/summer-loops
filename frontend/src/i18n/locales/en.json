@@ -587,5 +587,73 @@
         "developer": "Developer"
       }
     }
+  },
+  "relationshipCoach": {
+    "title": "Relationship Coach",
+    "attentionCount": "{{count}} contacts need attention",
+    "refresh": "Refresh Analysis",
+    "urgent": "Urgent",
+    "due": "Due",
+    "maintain": "Maintain",
+    "healthy": "Healthy"
+  },
+  "meeting": {
+    "prepMeeting": "Prep Meeting",
+    "logMeeting": "Log Meeting",
+    "briefTitle": "Meeting Brief",
+    "logMeetingTitle": "Log Meeting",
+    "generatingBrief": "Generating brief...",
+    "summary": "Summary",
+    "talkingPoints": "Talking Points",
+    "relationshipContext": "Relationship Context",
+    "lastInteraction": "Last Interaction",
+    "mutualConnections": "Mutual Connections",
+    "noBrief": "Failed to generate brief.",
+    "logDescription": "Describe what happened. AI will extract notes, action items, and follow-ups.",
+    "logPlaceholder": "Had coffee, discussed the new project. Need to send proposal by Friday.",
+    "processWithAI": "Process with AI",
+    "interactionCreated": "Interaction Logged",
+    "actionItems": "Action Items",
+    "reminderCreated": "Reminder created"
+  },
+  "smartReminders": {
+    "title": "AI Suggestions",
+    "refresh": "Refresh",
+    "accept": "Accept",
+    "dismiss": "Dismiss"
+  },
+  "messaging": {
+    "integrations": "Messaging Integrations",
+    "connected": "Connected",
+    "notConnected": "Not connected",
+    "connect": "Connect",
+    "disconnect": "Disconnect",
+    "connectTitle": "Connect {{platform}}",
+    "linkInstructions": "Open {{platform}} and send this code to the Warmly bot:",
+    "waitingForLink": "Waiting for connection... This modal will close automatically.",
+    "hint": "Connect messaging apps to add contacts by sending business cards or descriptions to the bot.",
+    "line": {
+      "step1AddBot": "Scan QR code to add Warmly bot on LINE:",
+      "step2SendCode": "Send this code to the Warmly bot:"
+    },
+    "whatsapp": {
+      "connectWhatsApp": "Connect WhatsApp",
+      "disconnectWhatsApp": "Disconnect",
+      "enterPhone": "Enter your phone number with country code (e.g. 14155551234):",
+      "getPairingCode": "Get Pairing Code",
+      "pairingCode": "Pairing Code",
+      "pairingInstructions": "Open WhatsApp → Linked Devices → Link a Device → Link with Phone Number, then enter this code:",
+      "connecting": "Connecting...",
+      "connected": "Connected",
+      "disconnected": "Not connected",
+      "importContacts": "Import",
+      "selectContactsToImport": "Select Contacts to Import",
+      "importSelected": "Import {{count}} Contact(s)",
+      "importSuccess": "Contacts imported successfully",
+      "noContactsFound": "No new contacts found. Try syncing again after WhatsApp finishes loading your contacts.",
+      "connectionLost": "Connection lost",
+      "reconnecting": "Reconnecting...",
+      "rateLimitWarning": "WhatsApp limits pairing attempts. If your code is rejected, please wait 15–30 minutes before trying again."
+    }
   }
 }

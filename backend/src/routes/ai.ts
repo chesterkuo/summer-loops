@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { sql, generateId } from '../db/postgres.js'
 import { authMiddleware } from '../middleware/auth.js'
-import { isGeminiAvailable, generateContactSummary, suggestInteraction, inferRelationships } from '../services/gemini.js'
+import { isGeminiAvailable, generateContactSummary, suggestInteraction, inferRelationships, analyzeRelationshipHealth, generateMeetingBrief, processMeetingFollowUp, analyzeInteractionPatterns } from '../services/gemini.js'
 import type { Contact, Relationship } from '../types/index.js'
 
 const ai = new Hono()
@@ -233,6 +233,356 @@ ai.post('/suggest-interaction/:contactId', async (c) => {
     console.error('Interaction suggestion failed:', error)
     return c.json({ error: 'Failed to generate interaction suggestion' }, 500)
   }
+})
+
+// ============================================================
+// v1.2 AI Features: Relationship Coach, Meeting Prep, Smart Reminders
+// ============================================================
+
+// Relationship Coach: Analyze all contacts and compute health scores
+ai.post('/relationship-coach/analyze', async (c) => {
+  if (!isGeminiAvailable()) {
+    return c.json({ error: 'AI features not available' }, 503)
+  }
+
+  const userId = c.get('user').userId
+  const locale = c.req.header('X-User-Locale') || c.req.query('locale')
+
+  const contacts = await sql<any[]>`
+    SELECT c.id, c.name, c.company, c.title
+    FROM contacts c WHERE c.user_id = ${userId}
+  `
+
+  if (contacts.length === 0) {
+    return c.json({ data: { analyzed: 0, results: [] } })
+  }
+
+  // Build interaction map
+  const interactions = await sql<any[]>`
+    SELECT contact_id, type, occurred_at, notes
+    FROM interactions WHERE user_id = ${userId}
+    ORDER BY occurred_at DESC
+  `
+  const interactionMap: Record<string, any[]> = {}
+  for (const i of interactions) {
+    if (!interactionMap[i.contact_id]) interactionMap[i.contact_id] = []
+    interactionMap[i.contact_id].push(i)
+  }
+
+  // Build relationship map
+  const relationships = await sql<any[]>`
+    SELECT contact_a_id, strength, relationship_type, how_met
+    FROM relationships
+    WHERE user_id = ${userId} AND is_user_relationship = true
+  `
+  const relationshipMap: Record<string, any> = {}
+  for (const r of relationships) {
+    relationshipMap[r.contact_a_id] = r
+  }
+
+  try {
+    const results = await analyzeRelationshipHealth(contacts, interactionMap, relationshipMap, locale)
+
+    // Upsert results into relationship_health_scores
+    const now = new Date().toISOString()
+    for (const r of results) {
+      const id = generateId()
+      await sql`
+        INSERT INTO relationship_health_scores (
+          id, user_id, contact_id, health_score, days_since_interaction,
+          avg_interaction_frequency_days, suggested_action, suggested_message,
+          priority, computed_at
+        ) VALUES (
+          ${id}, ${userId}, ${r.contactId}, ${r.healthScore}, ${r.daysSinceInteraction},
+          ${r.avgFrequencyDays}, ${r.suggestedAction}, ${r.suggestedMessage},
+          ${r.priority}, ${now}
+        )
+        ON CONFLICT (user_id, contact_id) DO UPDATE SET
+          health_score = EXCLUDED.health_score,
+          days_since_interaction = EXCLUDED.days_since_interaction,
+          avg_interaction_frequency_days = EXCLUDED.avg_interaction_frequency_days,
+          suggested_action = EXCLUDED.suggested_action,
+          suggested_message = EXCLUDED.suggested_message,
+          priority = EXCLUDED.priority,
+          computed_at = EXCLUDED.computed_at
+      `
+    }
+
+    return c.json({ data: { analyzed: contacts.length, results } })
+  } catch (error) {
+    console.error('Relationship coach analysis failed:', error)
+    return c.json({ error: 'Failed to analyze relationships' }, 500)
+  }
+})
+
+// Relationship Coach: Get dashboard grouped by priority
+ai.get('/relationship-coach/dashboard', async (c) => {
+  const userId = c.get('user').userId
+
+  const scores = await sql<any[]>`
+    SELECT rhs.*, c.name, c.company, c.title
+    FROM relationship_health_scores rhs
+    JOIN contacts c ON c.id = rhs.contact_id
+    WHERE rhs.user_id = ${userId}
+    ORDER BY rhs.health_score ASC
+  `
+
+  const grouped = {
+    urgent: scores.filter(s => s.priority === 'urgent'),
+    due: scores.filter(s => s.priority === 'due'),
+    maintain: scores.filter(s => s.priority === 'maintain'),
+    healthy: scores.filter(s => s.priority === 'healthy'),
+  }
+
+  return c.json({ data: grouped })
+})
+
+// Meeting Prep: Generate pre-meeting brief
+ai.post('/meeting/brief/:contactId', async (c) => {
+  if (!isGeminiAvailable()) {
+    return c.json({ error: 'AI features not available' }, 503)
+  }
+
+  const userId = c.get('user').userId
+  const { contactId } = c.req.param()
+  const locale = c.req.header('X-User-Locale') || c.req.query('locale')
+
+  const [contact] = await sql<Contact[]>`
+    SELECT * FROM contacts WHERE id = ${contactId} AND user_id = ${userId}
+  `
+  if (!contact) return c.json({ error: 'Contact not found' }, 404)
+
+  // Check for cached brief (valid 24h, same locale)
+  const effectiveLocale = locale || 'zh-TW'
+  const [cached] = await sql<any[]>`
+    SELECT * FROM meeting_briefs
+    WHERE user_id = ${userId} AND contact_id = ${contactId}
+    AND expires_at > NOW()
+    AND (locale = ${effectiveLocale} OR locale IS NULL)
+    ORDER BY created_at DESC LIMIT 1
+  `
+  if (cached && cached.locale === effectiveLocale) {
+    return c.json({ data: cached.brief_content })
+  }
+
+  const careerHistory = await sql`
+    SELECT * FROM career_history WHERE contact_id = ${contactId} ORDER BY start_date DESC
+  `
+  const educationHistory = await sql`
+    SELECT * FROM education_history WHERE contact_id = ${contactId} ORDER BY end_year DESC
+  `
+  const interactions = await sql`
+    SELECT * FROM interactions WHERE contact_id = ${contactId} ORDER BY occurred_at DESC LIMIT 10
+  `
+  const [relationship] = await sql`
+    SELECT * FROM relationships
+    WHERE user_id = ${userId} AND is_user_relationship = true AND contact_a_id = ${contactId}
+  `
+
+  // Find mutual contacts (contacts that share a relationship with this contact)
+  const mutualContacts = await sql<{ name: string; company: string | null }[]>`
+    SELECT DISTINCT c.name, c.company FROM relationships r
+    JOIN contacts c ON c.id = r.contact_a_id
+    WHERE r.user_id = ${userId}
+    AND r.contact_b_id = ${contactId}
+    AND r.is_user_relationship = false
+  `
+
+  try {
+    const brief = await generateMeetingBrief(
+      contact, careerHistory, educationHistory, interactions,
+      relationship, mutualContacts, locale
+    )
+
+    // Cache the brief for 24h
+    const id = generateId()
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    await sql`
+      INSERT INTO meeting_briefs (id, user_id, contact_id, brief_content, expires_at, locale)
+      VALUES (${id}, ${userId}, ${contactId}, ${JSON.stringify(brief)}, ${expiresAt}, ${effectiveLocale})
+    `
+
+    return c.json({ data: brief })
+  } catch (error) {
+    console.error('Meeting brief generation failed:', error)
+    return c.json({ error: 'Failed to generate meeting brief' }, 500)
+  }
+})
+
+// Meeting Follow-Up: Process post-meeting note
+ai.post('/meeting/follow-up/:contactId', async (c) => {
+  if (!isGeminiAvailable()) {
+    return c.json({ error: 'AI features not available' }, 503)
+  }
+
+  const userId = c.get('user').userId
+  const { contactId } = c.req.param()
+  const locale = c.req.header('X-User-Locale') || c.req.query('locale')
+  const { noteText } = await c.req.json<{ noteText: string }>()
+
+  if (!noteText || !noteText.trim()) {
+    return c.json({ error: 'noteText is required' }, 400)
+  }
+
+  const [contact] = await sql<Contact[]>`
+    SELECT * FROM contacts WHERE id = ${contactId} AND user_id = ${userId}
+  `
+  if (!contact) return c.json({ error: 'Contact not found' }, 404)
+
+  try {
+    const result = await processMeetingFollowUp(contact, noteText, locale)
+
+    // Auto-create interaction
+    const interactionId = generateId()
+    const now = new Date().toISOString()
+    await sql`
+      INSERT INTO interactions (id, user_id, contact_id, type, notes, occurred_at, created_at)
+      VALUES (${interactionId}, ${userId}, ${contactId}, ${result.interactionType}, ${result.cleanedNotes}, ${now}, ${now})
+    `
+
+    // Auto-create follow-up reminder if suggested
+    let createdReminder = null
+    if (result.followUpSuggestion) {
+      const reminderId = generateId()
+      const remindAt = new Date(Date.now() + result.followUpSuggestion.daysFromNow * 24 * 60 * 60 * 1000).toISOString()
+      await sql`
+        INSERT INTO notifications (id, user_id, contact_id, note, remind_at, status, created_at)
+        VALUES (${reminderId}, ${userId}, ${contactId}, ${result.followUpSuggestion.note}, ${remindAt}, 'pending', ${now})
+      `
+      createdReminder = { id: reminderId, note: result.followUpSuggestion.note, remindAt }
+    }
+
+    return c.json({
+      data: {
+        ...result,
+        createdInteraction: { id: interactionId, type: result.interactionType, notes: result.cleanedNotes },
+        createdReminder
+      }
+    })
+  } catch (error) {
+    console.error('Meeting follow-up processing failed:', error)
+    return c.json({ error: 'Failed to process meeting follow-up' }, 500)
+  }
+})
+
+// Smart Reminders: Analyze interaction patterns and create suggestions
+ai.post('/smart-reminders/analyze', async (c) => {
+  if (!isGeminiAvailable()) {
+    return c.json({ error: 'AI features not available' }, 503)
+  }
+
+  const userId = c.get('user').userId
+  const locale = c.req.header('X-User-Locale') || c.req.query('locale')
+
+  // Get contacts with relationship strength
+  const contacts = await sql<any[]>`
+    SELECT c.id, c.name, c.company,
+      COALESCE(r.strength, 3) as strength
+    FROM contacts c
+    LEFT JOIN relationships r ON r.contact_a_id = c.id AND r.user_id = c.user_id AND r.is_user_relationship = true
+    WHERE c.user_id = ${userId}
+  `
+
+  if (contacts.length === 0) {
+    return c.json({ data: { analyzed: 0, suggestions: [] } })
+  }
+
+  // Build interaction map
+  const interactions = await sql<any[]>`
+    SELECT contact_id, type, occurred_at
+    FROM interactions WHERE user_id = ${userId}
+    ORDER BY occurred_at DESC
+  `
+  const interactionMap: Record<string, any[]> = {}
+  for (const i of interactions) {
+    if (!interactionMap[i.contact_id]) interactionMap[i.contact_id] = []
+    interactionMap[i.contact_id].push(i)
+  }
+
+  try {
+    const results = await analyzeInteractionPatterns(contacts, interactionMap, locale)
+
+    // Store suggestions in DB
+    const now = new Date().toISOString()
+    for (const r of results) {
+      const id = generateId()
+      await sql`
+        INSERT INTO smart_reminder_suggestions (
+          id, user_id, contact_id, suggestion_text, reason,
+          suggested_date, confidence, status, created_at
+        ) VALUES (
+          ${id}, ${userId}, ${r.contactId}, ${r.suggestionText}, ${r.reason},
+          ${r.suggestedDate}, ${r.confidence}, 'pending', ${now}
+        )
+      `
+    }
+
+    return c.json({ data: { analyzed: contacts.length, suggestions: results } })
+  } catch (error) {
+    console.error('Smart reminders analysis failed:', error)
+    return c.json({ error: 'Failed to analyze interaction patterns' }, 500)
+  }
+})
+
+// Smart Reminders: List pending suggestions
+ai.get('/smart-reminders/suggestions', async (c) => {
+  const userId = c.get('user').userId
+
+  const suggestions = await sql<any[]>`
+    SELECT s.*, c.name, c.company, c.title
+    FROM smart_reminder_suggestions s
+    JOIN contacts c ON c.id = s.contact_id
+    WHERE s.user_id = ${userId} AND s.status = 'pending'
+    ORDER BY s.confidence DESC, s.suggested_date ASC
+  `
+
+  return c.json({ data: suggestions })
+})
+
+// Smart Reminders: Accept suggestion → create real notification
+ai.post('/smart-reminders/accept/:id', async (c) => {
+  const userId = c.get('user').userId
+  const { id } = c.req.param()
+
+  const [suggestion] = await sql<any[]>`
+    SELECT * FROM smart_reminder_suggestions
+    WHERE id = ${id} AND user_id = ${userId} AND status = 'pending'
+  `
+  if (!suggestion) return c.json({ error: 'Suggestion not found' }, 404)
+
+  const now = new Date().toISOString()
+
+  // Create real notification
+  const notificationId = generateId()
+  await sql`
+    INSERT INTO notifications (id, user_id, contact_id, note, remind_at, status, created_at)
+    VALUES (${notificationId}, ${userId}, ${suggestion.contact_id}, ${suggestion.suggestion_text}, ${suggestion.suggested_date}, 'pending', ${now})
+  `
+
+  // Mark suggestion as accepted
+  await sql`
+    UPDATE smart_reminder_suggestions SET status = 'accepted' WHERE id = ${id}
+  `
+
+  return c.json({ data: { notificationId, suggestion } })
+})
+
+// Smart Reminders: Dismiss suggestion
+ai.post('/smart-reminders/dismiss/:id', async (c) => {
+  const userId = c.get('user').userId
+  const { id } = c.req.param()
+
+  const [suggestion] = await sql<any[]>`
+    SELECT * FROM smart_reminder_suggestions
+    WHERE id = ${id} AND user_id = ${userId} AND status = 'pending'
+  `
+  if (!suggestion) return c.json({ error: 'Suggestion not found' }, 404)
+
+  await sql`
+    UPDATE smart_reminder_suggestions SET status = 'dismissed' WHERE id = ${id}
+  `
+
+  return c.json({ data: { dismissed: true } })
 })
 
 export default ai

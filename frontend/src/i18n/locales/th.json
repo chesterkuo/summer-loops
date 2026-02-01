@@ -324,5 +324,73 @@
     "passwordsDoNotMatch": "รหัสผ่านไม่ตรงกัน",
     "resetPasswordButton": "รีเซ็ตรหัสผ่าน",
     "passwordResetSuccess": "รีเซ็ตรหัสผ่านสำเร็จ คุณสามารถเข้าสู่ระบบได้แล้ว"
+  },
+  "relationshipCoach": {
+    "title": "โค้ชความสัมพันธ์",
+    "attentionCount": "{{count}} รายชื่อต้องการความสนใจ",
+    "refresh": "รีเฟรชการวิเคราะห์",
+    "urgent": "เร่งด่วน",
+    "due": "ครบกำหนด",
+    "maintain": "รักษา",
+    "healthy": "ดี"
+  },
+  "meeting": {
+    "prepMeeting": "เตรียมการประชุม",
+    "logMeeting": "บันทึกการประชุม",
+    "briefTitle": "สรุปการประชุม",
+    "logMeetingTitle": "บันทึกการประชุม",
+    "generatingBrief": "กำลังสร้างสรุป...",
+    "summary": "สรุป",
+    "talkingPoints": "ประเด็นสนทนา",
+    "relationshipContext": "บริบทความสัมพันธ์",
+    "lastInteraction": "การติดต่อล่าสุด",
+    "mutualConnections": "ผู้ติดต่อร่วม",
+    "noBrief": "ไม่สามารถสร้างสรุปได้",
+    "logDescription": "อธิบายเนื้อหาการประชุม AI จะแยกบันทึก รายการดำเนินการ และการติดตาม",
+    "logPlaceholder": "ดื่มกาแฟ พูดคุยเรื่องโปรเจกต์ใหม่ ต้องส่งข้อเสนอภายในวันศุกร์",
+    "processWithAI": "ประมวลผลด้วย AI",
+    "interactionCreated": "บันทึกการติดต่อแล้ว",
+    "actionItems": "รายการดำเนินการ",
+    "reminderCreated": "สร้างการเตือนแล้ว"
+  },
+  "smartReminders": {
+    "title": "คำแนะนำ AI",
+    "refresh": "รีเฟรช",
+    "accept": "ยอมรับ",
+    "dismiss": "ข้าม"
+  },
+  "messaging": {
+    "integrations": "การเชื่อมต่อแชท",
+    "connected": "เชื่อมต่อแล้ว",
+    "notConnected": "ยังไม่ได้เชื่อมต่อ",
+    "connect": "เชื่อมต่อ",
+    "disconnect": "ยกเลิกการเชื่อมต่อ",
+    "connectTitle": "เชื่อมต่อ {{platform}}",
+    "linkInstructions": "เปิด {{platform}} และส่งรหัสนี้ไปยังบอท Warmly:",
+    "waitingForLink": "รอการเชื่อมต่อ... หน้าต่างนี้จะปิดโดยอัตโนมัติ",
+    "hint": "เชื่อมต่อแอปแชทเพื่อเพิ่มรายชื่อโดยส่งนามบัตรหรือคำอธิบายให้บอท",
+    "line": {
+      "step1AddBot": "สแกน QR โค้ดเพื่อเพิ่มบอท Warmly บน LINE:",
+      "step2SendCode": "ส่งรหัสนี้ให้บอท Warmly:"
+    },
+    "whatsapp": {
+      "connectWhatsApp": "เชื่อมต่อ WhatsApp",
+      "disconnectWhatsApp": "ยกเลิกการเชื่อมต่อ",
+      "enterPhone": "กรอกหมายเลขโทรศัพท์พร้อมรหัสประเทศ (เช่น 66812345678):",
+      "getPairingCode": "รับรหัสจับคู่",
+      "pairingCode": "รหัสจับคู่",
+      "pairingInstructions": "เปิด WhatsApp → อุปกรณ์ที่เชื่อมต่อ → เชื่อมต่ออุปกรณ์ → เชื่อมต่อด้วยหมายเลขโทรศัพท์ แล้วกรอกรหัสนี้:",
+      "connecting": "กำลังเชื่อมต่อ...",
+      "connected": "เชื่อมต่อแล้ว",
+      "disconnected": "ไม่ได้เชื่อมต่อ",
+      "importContacts": "นำเข้า",
+      "selectContactsToImport": "เลือกรายชื่อที่จะนำเข้า",
+      "importSelected": "นำเข้า {{count}} รายชื่อ",
+      "importSuccess": "นำเข้ารายชื่อสำเร็จ",
+      "noContactsFound": "ไม่พบรายชื่อใหม่ ลองซิงค์อีกครั้ง",
+      "connectionLost": "การเชื่อมต่อหลุด",
+      "reconnecting": "กำลังเชื่อมต่อใหม่...",
+      "rateLimitWarning": "WhatsApp จำกัดจำนวนครั้งในการจับคู่ หากรหัสถูกปฏิเสธ กรุณารอ 15–30 นาทีก่อนลองใหม่"
+    }
   }
 }

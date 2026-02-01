@@ -13,6 +13,8 @@ import search from './routes/search.js'
 import ai from './routes/ai.js'
 import notifications from './routes/notifications.js'
 import teams from './routes/teams.js'
+import messaging from './routes/messaging.js'
+import { restoreActiveSessions, shutdownAll } from './services/whatsappProxy.js'
 
 const app = new Hono()
 
@@ -20,6 +22,8 @@ const app = new Hono()
 initDb().then(() => {
   // Seed demo user if not exists
   seedDemoData()
+  // restoreActiveSessions is a no-op — the worker handles its own session restoration
+  restoreActiveSessions().catch(err => console.error('Failed to restore WhatsApp sessions:', err))
 })
 
 // Initialize Gemini AI
@@ -48,6 +52,7 @@ app.route('/api/search', search)
 app.route('/api/ai', ai)
 app.route('/api/notifications', notifications)
 app.route('/api/teams', teams)
+app.route('/api/messaging', messaging)
 
 // Seed demo data for testing
 async function seedDemoData() {
@@ -135,3 +140,12 @@ Bun.serve({
 })
 
 console.log(`Warmly API running on http://${host}:${port}`)
+
+// Graceful shutdown
+const handleShutdown = async () => {
+  console.log('Shutting down...')
+  await shutdownAll()
+  process.exit(0)
+}
+process.on('SIGINT', handleShutdown)
+process.on('SIGTERM', handleShutdown)

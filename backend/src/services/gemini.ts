@@ -2,6 +2,23 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 
+// Locale-aware AI output language helper
+const LOCALE_MAP: Record<string, string> = {
+  'en': 'Respond in English.',
+  'zh-TW': 'Respond in Traditional Chinese (繁體中文).',
+  'zh-CN': 'Respond in Simplified Chinese (简体中文).',
+  'ja': 'Respond in Japanese (日本語).',
+  'ko': 'Respond in Korean (한국어).',
+  'vi': 'Respond in Vietnamese (Tiếng Việt).',
+  'th': 'Respond in Thai (ไทย).',
+  'es': 'Respond in Spanish (Español).',
+  'fr': 'Respond in French (Français).',
+}
+
+export function getLocaleInstruction(locale?: string): string {
+  return LOCALE_MAP[locale || 'zh-TW'] || LOCALE_MAP['zh-TW']
+}
+
 let genAI: GoogleGenerativeAI | null = null
 let model: any = null
 let visionModel: any = null
@@ -422,4 +439,386 @@ export async function inferRelationships(
   }
 
   return inferences
+}
+
+// ==================== v1.2 AI Features ====================
+
+/**
+ * Helper to clean JSON from Gemini responses
+ */
+function cleanJsonResponse(text: string): string {
+  let cleaned = text.trim()
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/```json?\n?/g, '').replace(/```$/g, '').trim()
+  }
+  return cleaned
+}
+
+/**
+ * Analyze relationship health for a batch of contacts
+ */
+export async function analyzeRelationshipHealth(
+  contacts: { id: string; name: string; company?: string; title?: string }[],
+  interactionMap: Record<string, { type: string; occurred_at: string; notes?: string }[]>,
+  relationshipMap: Record<string, { strength: number; relationship_type?: string; how_met?: string }>,
+  locale?: string
+): Promise<{
+  contactId: string
+  healthScore: number
+  daysSinceInteraction: number | null
+  avgFrequencyDays: number | null
+  suggestedAction: string
+  suggestedMessage: string
+  priority: 'urgent' | 'due' | 'maintain' | 'healthy'
+}[]> {
+  if (!model) throw new Error('Gemini AI not initialized')
+
+  const results: any[] = []
+  const now = Date.now()
+
+  for (const contact of contacts) {
+    const interactions = interactionMap[contact.id] || []
+    const relationship = relationshipMap[contact.id]
+    const strength = relationship?.strength || 3
+
+    // Deterministic health score calculation
+    let daysSince: number | null = null
+    let avgFreq: number | null = null
+
+    if (interactions.length > 0) {
+      const sorted = interactions.sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime())
+      daysSince = Math.floor((now - new Date(sorted[0].occurred_at).getTime()) / (1000 * 60 * 60 * 24))
+
+      if (sorted.length >= 2) {
+        const first = new Date(sorted[sorted.length - 1].occurred_at).getTime()
+        const last = new Date(sorted[0].occurred_at).getTime()
+        avgFreq = Math.round((last - first) / (1000 * 60 * 60 * 24) / (sorted.length - 1))
+      }
+    }
+
+    // Score calculation
+    let score = 100
+    const expectedFreq = avgFreq || (strength >= 4 ? 14 : strength >= 3 ? 30 : 60)
+
+    if (daysSince !== null) {
+      const overdueFactor = daysSince / expectedFreq
+      if (overdueFactor > 2) score -= 60
+      else if (overdueFactor > 1.5) score -= 40
+      else if (overdueFactor > 1) score -= 20
+      else score -= Math.round(overdueFactor * 10)
+    } else {
+      score = 30 // Never interacted
+    }
+
+    // Boost for strong relationships
+    score = Math.max(0, Math.min(100, score + (strength - 3) * 5))
+
+    const priority = score < 30 ? 'urgent' : score < 50 ? 'due' : score < 75 ? 'maintain' : 'healthy'
+
+    results.push({
+      contactId: contact.id,
+      healthScore: score,
+      daysSinceInteraction: daysSince,
+      avgFrequencyDays: avgFreq,
+      priority,
+      _contact: contact,
+      _interactions: interactions.slice(0, 3),
+      _relationship: relationship,
+    })
+  }
+
+  // Generate AI suggestions only for urgent + due contacts (to save API calls)
+  const needsSuggestion = results.filter(r => r.priority === 'urgent' || r.priority === 'due')
+
+  if (needsSuggestion.length > 0 && model) {
+    const langInstruction = getLocaleInstruction(locale)
+    const contactList = needsSuggestion.map(r => {
+      const c = r._contact
+      const rel = r._relationship
+      return `- ${c.name} (${c.company || 'unknown'}, ${c.title || 'unknown'}): strength ${rel?.strength || '?'}/5, ${r.daysSinceInteraction !== null ? `last contact ${r.daysSinceInteraction} days ago` : 'never contacted'}, priority: ${r.priority}`
+    }).join('\n')
+
+    const prompt = `You are a relationship coaching AI for a CRM app. For each contact below, provide a brief suggested action and a short outreach message draft.
+
+Contacts needing attention:
+${contactList}
+
+${langInstruction}
+
+Return a JSON array with one object per contact:
+[
+  {
+    "name": "Contact name",
+    "suggestedAction": "Brief action suggestion (1 sentence)",
+    "suggestedMessage": "Short outreach message draft (2-3 sentences)"
+  }
+]
+
+Rules:
+- Return ONLY valid JSON, no markdown
+- Make suggestions specific and actionable
+- Messages should feel warm and natural, not robotic
+- Consider relationship strength and time gap`
+
+    try {
+      const result = await model.generateContent(prompt)
+      const parsed = JSON.parse(cleanJsonResponse(result.response.text()))
+
+      for (const suggestion of parsed) {
+        const match = needsSuggestion.find(r => r._contact.name === suggestion.name)
+        if (match) {
+          match.suggestedAction = suggestion.suggestedAction
+          match.suggestedMessage = suggestion.suggestedMessage
+        }
+      }
+    } catch (e) {
+      console.error('Failed to generate relationship coach suggestions:', e)
+    }
+  }
+
+  // Fill defaults for contacts without AI suggestions
+  return results.map(r => ({
+    contactId: r.contactId,
+    healthScore: r.healthScore,
+    daysSinceInteraction: r.daysSinceInteraction,
+    avgFrequencyDays: r.avgFrequencyDays,
+    suggestedAction: r.suggestedAction || '',
+    suggestedMessage: r.suggestedMessage || '',
+    priority: r.priority,
+  }))
+}
+
+/**
+ * Generate a pre-meeting brief for a contact
+ */
+export async function generateMeetingBrief(
+  contact: any,
+  careerHistory: any[],
+  educationHistory: any[],
+  interactions: any[],
+  relationship: any,
+  mutualContacts: { name: string; company?: string }[],
+  locale?: string
+): Promise<{
+  summary: string
+  talkingPoints: string[]
+  relationshipContext: string
+  lastInteractionRecap: string
+  mutualConnections: string
+}> {
+  if (!model) throw new Error('Gemini AI not initialized')
+
+  const langInstruction = getLocaleInstruction(locale)
+
+  const careerStr = careerHistory.length > 0
+    ? careerHistory.map(c => `${c.title || 'Role'} at ${c.company} (${c.start_date || '?'} - ${c.end_date || 'present'})`).join('; ')
+    : 'Unknown'
+
+  const eduStr = educationHistory.length > 0
+    ? educationHistory.map(e => `${e.degree || ''} ${e.field || ''} from ${e.school}`).join('; ')
+    : 'Unknown'
+
+  const recentInteractions = interactions.slice(0, 5).map(i =>
+    `${i.type} on ${i.occurred_at}: ${i.notes || 'No notes'}`
+  ).join('\n')
+
+  const mutualStr = mutualContacts.length > 0
+    ? mutualContacts.map(m => `${m.name} (${m.company || ''})`).join(', ')
+    : 'None found'
+
+  const prompt = `Generate a pre-meeting brief for this contact.
+
+Contact:
+- Name: ${contact.name}
+- Company: ${contact.company || 'Unknown'}
+- Title: ${contact.title || 'Unknown'}
+- Notes: ${contact.notes || 'None'}
+- Career: ${careerStr}
+- Education: ${eduStr}
+- Relationship strength: ${relationship?.strength || '?'}/5
+- How we met: ${relationship?.how_met || 'Unknown'}
+- Mutual connections: ${mutualStr}
+
+Recent interactions:
+${recentInteractions || 'No recorded interactions'}
+
+${langInstruction}
+
+Return a JSON object:
+{
+  "summary": "2-3 sentence professional summary of who this person is",
+  "talkingPoints": ["3-5 specific talking points for the meeting"],
+  "relationshipContext": "1-2 sentences about your relationship history",
+  "lastInteractionRecap": "Brief recap of last interaction, or 'No previous interactions'",
+  "mutualConnections": "Brief note about mutual connections"
+}
+
+Rules:
+- Return ONLY valid JSON, no markdown
+- Make talking points specific and relevant
+- Be concise but informative`
+
+  const result = await model.generateContent(prompt)
+  return JSON.parse(cleanJsonResponse(result.response.text()))
+}
+
+/**
+ * Process a post-meeting follow-up note
+ */
+export async function processMeetingFollowUp(
+  contact: any,
+  noteText: string,
+  locale?: string
+): Promise<{
+  cleanedNotes: string
+  actionItems: { task: string; dueDate?: string }[]
+  interactionType: string
+  followUpSuggestion: { note: string; daysFromNow: number } | null
+}> {
+  if (!model) throw new Error('Gemini AI not initialized')
+
+  const langInstruction = getLocaleInstruction(locale)
+
+  const prompt = `Process this post-meeting note and extract structured information.
+
+Contact: ${contact.name} (${contact.company || ''}, ${contact.title || ''})
+Meeting note from user:
+"${noteText}"
+
+${langInstruction}
+
+Return a JSON object:
+{
+  "cleanedNotes": "Clean, well-formatted version of the meeting notes",
+  "actionItems": [
+    { "task": "Action item description", "dueDate": "YYYY-MM-DD or null" }
+  ],
+  "interactionType": "meeting|call|message|email|other",
+  "followUpSuggestion": {
+    "note": "Suggested follow-up reminder text",
+    "daysFromNow": 7
+  }
+}
+
+Rules:
+- Return ONLY valid JSON, no markdown
+- Extract ALL action items mentioned
+- Infer due dates from context (e.g., "next week" = 7 days)
+- If no follow-up needed, set followUpSuggestion to null
+- Determine the most likely interaction type from context`
+
+  const result = await model.generateContent(prompt)
+  return JSON.parse(cleanJsonResponse(result.response.text()))
+}
+
+/**
+ * Analyze interaction patterns and suggest smart reminders
+ */
+export async function analyzeInteractionPatterns(
+  contacts: { id: string; name: string; company?: string; strength: number }[],
+  interactionMap: Record<string, { type: string; occurred_at: string }[]>,
+  locale?: string
+): Promise<{
+  contactId: string
+  suggestionText: string
+  reason: string
+  suggestedDate: string
+  confidence: number
+}[]> {
+  if (!model) throw new Error('Gemini AI not initialized')
+
+  const now = Date.now()
+  const suggestions: any[] = []
+
+  // Find overdue contacts based on interaction patterns
+  const overdueContacts: { contact: any; daysSince: number; avgFreq: number; overdueFactor: number }[] = []
+
+  for (const contact of contacts) {
+    const interactions = interactionMap[contact.id] || []
+    if (interactions.length === 0) {
+      // Never interacted with strong contact — suggest
+      if (contact.strength >= 3) {
+        overdueContacts.push({ contact, daysSince: -1, avgFreq: 30, overdueFactor: 2 })
+      }
+      continue
+    }
+
+    const sorted = interactions.sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime())
+    const daysSince = Math.floor((now - new Date(sorted[0].occurred_at).getTime()) / (1000 * 60 * 60 * 24))
+
+    let avgFreq: number
+    if (sorted.length >= 2) {
+      const first = new Date(sorted[sorted.length - 1].occurred_at).getTime()
+      const last = new Date(sorted[0].occurred_at).getTime()
+      avgFreq = Math.round((last - first) / (1000 * 60 * 60 * 24) / (sorted.length - 1))
+    } else {
+      avgFreq = contact.strength >= 4 ? 14 : contact.strength >= 3 ? 30 : 60
+    }
+
+    const overdueFactor = daysSince / Math.max(avgFreq, 1)
+    if (overdueFactor >= 1.3) {
+      overdueContacts.push({ contact, daysSince, avgFreq, overdueFactor })
+    }
+  }
+
+  if (overdueContacts.length === 0) return []
+
+  // Sort by overdue factor descending and take top 10
+  overdueContacts.sort((a, b) => b.overdueFactor - a.overdueFactor)
+  const top = overdueContacts.slice(0, 10)
+
+  const langInstruction = getLocaleInstruction(locale)
+  const contactList = top.map(o => {
+    const c = o.contact
+    if (o.daysSince === -1) {
+      return `- ${c.name} (${c.company || '?'}): strength ${c.strength}/5, never contacted`
+    }
+    return `- ${c.name} (${c.company || '?'}): strength ${c.strength}/5, last contact ${o.daysSince} days ago, usual frequency every ${o.avgFreq} days`
+  }).join('\n')
+
+  const prompt = `You are a smart reminder AI. For each overdue contact, suggest a follow-up reminder.
+
+Overdue contacts:
+${contactList}
+
+${langInstruction}
+
+Return a JSON array:
+[
+  {
+    "name": "Contact name",
+    "suggestionText": "What to remind the user to do (1 sentence)",
+    "reason": "Why this reminder (1 sentence)",
+    "daysFromNow": 1
+  }
+]
+
+Rules:
+- Return ONLY valid JSON, no markdown
+- Be specific about what action to take
+- daysFromNow should be 1-7 (more urgent = sooner)
+- Reason should reference the interaction gap`
+
+  try {
+    const result = await model.generateContent(prompt)
+    const parsed = JSON.parse(cleanJsonResponse(result.response.text()))
+
+    for (const suggestion of parsed) {
+      const match = top.find(o => o.contact.name === suggestion.name)
+      if (match) {
+        const suggestedDate = new Date(now + (suggestion.daysFromNow || 3) * 24 * 60 * 60 * 1000)
+        suggestions.push({
+          contactId: match.contact.id,
+          suggestionText: suggestion.suggestionText,
+          reason: suggestion.reason,
+          suggestedDate: suggestedDate.toISOString(),
+          confidence: Math.min(0.95, 0.5 + match.overdueFactor * 0.15),
+        })
+      }
+    }
+  } catch (e) {
+    console.error('Failed to generate smart reminder suggestions:', e)
+  }
+
+  return suggestions
 }
