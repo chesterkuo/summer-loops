@@ -137,7 +137,7 @@ async function connectUser(userId: string): Promise<{ sessionId: string }> {
     printQRInTerminal: false,
     mobile: false,
     auth: state,
-    browser: ['Warmly', 'Chrome', '22.04.4'],
+    browser: Browsers.ubuntu('Chrome'),
     defaultQueryTimeoutMs: undefined,
   })
 
@@ -306,7 +306,7 @@ async function restoreSession(userId: string, sessionId: string): Promise<void> 
     printQRInTerminal: false,
     mobile: false,
     auth: state,
-    browser: ['Warmly', 'Chrome', '22.04.4'],
+    browser: Browsers.ubuntu('Chrome'),
     defaultQueryTimeoutMs: undefined,
   })
 
@@ -327,7 +327,7 @@ async function restoreSessionInMemory(
     printQRInTerminal: false,
     mobile: false,
     auth: existingState,
-    browser: ['Warmly', 'Chrome', '22.04.4'],
+    browser: Browsers.ubuntu('Chrome'),
     defaultQueryTimeoutMs: undefined,
   })
 

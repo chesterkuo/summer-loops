@@ -4,8 +4,8 @@
   "platformVersion": "7.4.4",
   "title": "Warmly - Personal CRM",
   "description": "Personal CRM for meaningful connections",
-  "version": "1.1.0",
-  "build": "58",
+  "version": "1.2.0",
+  "build": "1",
   "author": "Warmly Team",
   "email": "chester.kuo1978@gmail.com",
 
@@ -20,7 +20,7 @@
   "ios": {
     "developmentTeam": "76TVWYJ6PL",
     "scheme": "App",
-    "buildNumber": "58"
+    "buildNumber": "1"
   },
 
   "iosUpload": true,
