@@ -633,6 +633,7 @@ export interface Notification {
   status: 'pending' | 'done'
   createdAt: string
   completedAt: string | null
+  googleEventId: string | null
 }
 
 export interface NotificationsResponse {
@@ -843,9 +844,43 @@ export const teamsApi = {
   },
 
   async updateAutoShare(teamId: string, data: { autoShare: boolean; visibility?: 'basic' | 'full' }) {
-    return apiFetch<{ autoShare: boolean; visibility: string }>(`/teams/${teamId}/auto-share`, {
+    return apiFetch<{ autoSync: boolean; visibility: string }>(`/teams/${teamId}/auto-share`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    })
+  },
+}
+
+// Google Calendar API
+export const googleCalendarApi = {
+  async getConnectUrl() {
+    return apiFetch<{ url: string }>('/google-calendar/connect-url')
+  },
+
+  async getStatus() {
+    return apiFetch<{ connected: boolean; autoSync: boolean; connectedAt: string | null }>('/google-calendar/status')
+  },
+
+  async updateSettings(data: { autoSync: boolean }) {
+    return apiFetch<{ autoSync: boolean }>('/google-calendar/settings', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  },
+
+  async disconnect() {
+    return apiFetch('/google-calendar/disconnect', { method: 'POST' })
+  },
+
+  async syncNotification(notificationId: string) {
+    return apiFetch<{ googleEventId: string }>(`/google-calendar/sync/notification/${notificationId}`, {
+      method: 'POST',
+    })
+  },
+
+  async unsyncNotification(notificationId: string) {
+    return apiFetch(`/google-calendar/sync/notification/${notificationId}`, {
+      method: 'DELETE',
     })
   },
 }

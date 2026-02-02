@@ -14,6 +14,7 @@ import ai from './routes/ai.js'
 import notifications from './routes/notifications.js'
 import teams from './routes/teams.js'
 import messaging from './routes/messaging.js'
+import googleCalendar from './routes/googleCalendar.js'
 import { restoreActiveSessions, shutdownAll } from './services/whatsappProxy.js'
 
 const app = new Hono()
@@ -53,6 +54,7 @@ app.route('/api/ai', ai)
 app.route('/api/notifications', notifications)
 app.route('/api/teams', teams)
 app.route('/api/messaging', messaging)
+app.route('/api/google-calendar', googleCalendar)
 
 // Seed demo data for testing
 async function seedDemoData() {

@@ -2,6 +2,12 @@ import { Hono } from 'hono'
 import { sql, generateId } from '../db/postgres.js'
 import { authMiddleware } from '../middleware/auth.js'
 import { isGeminiAvailable, generateContactSummary, suggestInteraction, inferRelationships, analyzeRelationshipHealth, generateMeetingBrief, processMeetingFollowUp, analyzeInteractionPatterns } from '../services/gemini.js'
+import {
+  isAutoSyncEnabled,
+  createCalendarEvent,
+  buildReminderEvent,
+  buildActionItemEvent,
+} from '../services/googleCalendar.js'
 import type { Contact, Relationship } from '../types/index.js'
 
 const ai = new Hono()
@@ -450,6 +456,34 @@ ai.post('/meeting/follow-up/:contactId', async (c) => {
         VALUES (${reminderId}, ${userId}, ${contactId}, ${result.followUpSuggestion.note}, ${remindAt}, 'pending', ${now})
       `
       createdReminder = { id: reminderId, note: result.followUpSuggestion.note, remindAt }
+    }
+
+    // Sync to Google Calendar if auto-sync is enabled
+    const autoSync = await isAutoSyncEnabled(userId)
+    if (autoSync && createdReminder) {
+      const event = buildReminderEvent({
+        note: createdReminder.note,
+        remindAt: createdReminder.remindAt,
+        contactName: contact.name,
+      })
+      const eventId = await createCalendarEvent(userId, event)
+      if (eventId) {
+        await sql`UPDATE notifications SET google_event_id = ${eventId} WHERE id = ${createdReminder.id}`
+      }
+    }
+
+    // Also sync action items with due dates to Google Calendar
+    if (autoSync && result.actionItems?.length > 0) {
+      for (const item of result.actionItems) {
+        if (item.dueDate) {
+          const event = buildActionItemEvent({
+            task: item.task,
+            dueDate: item.dueDate,
+            contactName: contact.name,
+          })
+          await createCalendarEvent(userId, event)
+        }
+      }
     }
 
     return c.json({

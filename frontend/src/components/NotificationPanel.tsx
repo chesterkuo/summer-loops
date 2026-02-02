@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNotificationStore } from '../stores/notificationStore';
+import { googleCalendarApi } from '../services/api';
 import NotificationItem from './NotificationItem';
 
 interface NotificationPanelProps {
@@ -22,9 +23,14 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ onContactClick })
     deleteNotification,
   } = useNotificationStore();
 
+  const [calendarConnected, setCalendarConnected] = useState(false);
+
   useEffect(() => {
     if (isPanelOpen) {
       fetchNotifications();
+      googleCalendarApi.getStatus().then((res) => {
+        if (res.data) setCalendarConnected(res.data.connected);
+      });
     }
   }, [isPanelOpen, fetchNotifications]);
 
@@ -33,6 +39,16 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ onContactClick })
   const handleContactClick = (contactId: string) => {
     closePanel();
     onContactClick?.(contactId);
+  };
+
+  const handleSyncCalendar = async (notificationId: string) => {
+    await googleCalendarApi.syncNotification(notificationId);
+    fetchNotifications();
+  };
+
+  const handleUnsyncCalendar = async (notificationId: string) => {
+    await googleCalendarApi.unsyncNotification(notificationId);
+    fetchNotifications();
   };
 
   return (
@@ -79,6 +95,9 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ onContactClick })
                         onMarkDone={markDone}
                         onDelete={deleteNotification}
                         onContactClick={handleContactClick}
+                        calendarConnected={calendarConnected}
+                        onSyncCalendar={handleSyncCalendar}
+                        onUnsyncCalendar={handleUnsyncCalendar}
                       />
                     ))}
                   </div>
@@ -99,6 +118,9 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ onContactClick })
                         onMarkDone={markDone}
                         onDelete={deleteNotification}
                         onContactClick={handleContactClick}
+                        calendarConnected={calendarConnected}
+                        onSyncCalendar={handleSyncCalendar}
+                        onUnsyncCalendar={handleUnsyncCalendar}
                       />
                     ))}
                   </div>
@@ -118,6 +140,9 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ onContactClick })
                         notification={notification}
                         onDelete={deleteNotification}
                         onContactClick={handleContactClick}
+                        calendarConnected={calendarConnected}
+                        onSyncCalendar={handleSyncCalendar}
+                        onUnsyncCalendar={handleUnsyncCalendar}
                       />
                     ))}
                   </div>

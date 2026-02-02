@@ -6,6 +6,12 @@ import type {
   UpdateNotificationRequest,
 } from '../types/index.js'
 import { authMiddleware } from '../middleware/auth.js'
+import {
+  isAutoSyncEnabled,
+  createCalendarEvent,
+  buildReminderEvent,
+  deleteCalendarEvent,
+} from '../services/googleCalendar.js'
 
 const notifications = new Hono()
 
@@ -23,7 +29,8 @@ function mapNotification(row: any): Notification & { contactName?: string } {
     status: row.status,
     createdAt: row.created_at,
     completedAt: row.completed_at,
-    contactName: row.contact_name
+    contactName: row.contact_name,
+    googleEventId: row.google_event_id || null,
   }
 }
 
@@ -125,6 +132,27 @@ notifications.post('/', async (c) => {
     WHERE n.id = ${id}
   `
 
+  // Auto-sync to Google Calendar if enabled
+  const autoSync = await isAutoSyncEnabled(userId)
+  if (autoSync) {
+    let contactName: string | null = null
+    if (body.contactId) {
+      const [contact] = await sql`SELECT name FROM contacts WHERE id = ${body.contactId}`
+      contactName = contact?.name || null
+    }
+
+    const event = buildReminderEvent({
+      note: row.note,
+      remindAt: row.remind_at,
+      contactName,
+    })
+    const eventId = await createCalendarEvent(userId, event)
+    if (eventId) {
+      await sql`UPDATE notifications SET google_event_id = ${eventId} WHERE id = ${id}`
+      row.google_event_id = eventId
+    }
+  }
+
   return c.json({ data: mapNotification(row) }, 201)
 })
 
@@ -170,6 +198,10 @@ notifications.patch('/:id', async (c) => {
     updateValues.status = body.status
     if (body.status === 'done') {
       updateValues.completed_at = new Date().toISOString()
+      // Remove from Google Calendar when marking done
+      if (existing.google_event_id) {
+        await deleteCalendarEvent(userId, existing.google_event_id)
+      }
     }
   }
 
@@ -209,6 +241,11 @@ notifications.delete('/:id', async (c) => {
 
   if (!existing) {
     return c.json({ error: 'Notification not found' }, 404)
+  }
+
+  // Delete from Google Calendar if synced
+  if (existing.google_event_id) {
+    await deleteCalendarEvent(userId, existing.google_event_id)
   }
 
   await sql`DELETE FROM notifications WHERE id = ${id}`

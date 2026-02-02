@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Notification } from '../services/api';
 
@@ -7,6 +7,9 @@ interface NotificationItemProps {
   onMarkDone?: (id: string) => void;
   onDelete?: (id: string) => void;
   onContactClick?: (contactId: string) => void;
+  onSyncCalendar?: (id: string) => Promise<void>;
+  onUnsyncCalendar?: (id: string) => Promise<void>;
+  calendarConnected?: boolean;
 }
 
 function formatRelativeTime(dateStr: string, t: (key: string, options?: Record<string, unknown>) => string): string {
@@ -39,10 +42,28 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
   onMarkDone,
   onDelete,
   onContactClick,
+  onSyncCalendar,
+  onUnsyncCalendar,
+  calendarConnected,
 }) => {
   const { t } = useTranslation();
+  const [isSyncingCal, setIsSyncingCal] = useState(false);
   const isPending = notification.status === 'pending';
   const isPastDue = isPending && new Date(notification.remindAt) <= new Date();
+
+  const handleCalendarToggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsSyncingCal(true);
+    try {
+      if (notification.googleEventId) {
+        await onUnsyncCalendar?.(notification.id);
+      } else {
+        await onSyncCalendar?.(notification.id);
+      }
+    } finally {
+      setIsSyncingCal(false);
+    }
+  };
 
   return (
     <div className={`p-3 rounded-lg ${isPastDue ? 'bg-red-900/20 border border-red-800/50' : 'bg-surface-card'}`}>
@@ -67,6 +88,22 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
         </div>
 
         <div className="flex items-center gap-1">
+          {calendarConnected && (
+            <button
+              onClick={handleCalendarToggle}
+              disabled={isSyncingCal}
+              className={`p-1.5 rounded-full transition-colors disabled:opacity-50 ${
+                notification.googleEventId
+                  ? 'text-blue-400 hover:bg-blue-500/20'
+                  : 'text-gray-500 hover:bg-white/10 hover:text-blue-400'
+              }`}
+              title={notification.googleEventId ? 'Remove from Google Calendar' : 'Add to Google Calendar'}
+            >
+              <span className={`material-symbols-outlined text-[16px] ${isSyncingCal ? 'animate-spin' : ''}`}>
+                {isSyncingCal ? 'progress_activity' : notification.googleEventId ? 'event_available' : 'calendar_add_on'}
+              </span>
+            </button>
+          )}
           {isPending && onMarkDone && (
             <button
               onClick={() => onMarkDone(notification.id)}

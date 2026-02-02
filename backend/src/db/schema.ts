@@ -284,6 +284,7 @@ export const notifications = pgTable(
     remindAt: timestamp('remind_at', { withTimezone: true }).notNull(),
     status: text('status').notNull().default('pending'),
     completedAt: timestamp('completed_at', { withTimezone: true }),
+    googleEventId: text('google_event_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   },
   (table) => ({
@@ -293,5 +294,26 @@ export const notifications = pgTable(
       table.status,
       table.remindAt
     ),
+  })
+)
+
+// ============ GOOGLE CALENDAR TOKENS ============
+export const googleCalendarTokens = pgTable(
+  'google_calendar_tokens',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    accessToken: text('access_token').notNull(),
+    refreshToken: text('refresh_token').notNull(),
+    tokenExpiry: timestamp('token_expiry', { withTimezone: true }).notNull(),
+    scopes: text('scopes').notNull(),
+    autoSync: boolean('auto_sync').default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    userIdx: uniqueIndex('unique_gcal_user').on(table.userId),
   })
 )

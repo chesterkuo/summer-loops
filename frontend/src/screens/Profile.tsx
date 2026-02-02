@@ -7,7 +7,7 @@ import { useContactStore } from '../stores/contactStore';
 import { useLocaleStore } from '../stores/localeStore';
 import { useNotificationStore } from '../stores/notificationStore';
 import { useAuthStore } from '../stores/authStore';
-import { relationshipsApi, interactionsApi, aiApi, messagingApi, Relationship, Interaction, Contact } from '../services/api';
+import { relationshipsApi, interactionsApi, aiApi, messagingApi, googleCalendarApi, Relationship, Interaction, Contact } from '../services/api';
 
 interface ProfileProps {
   onNavigate: (screen: ScreenName) => void;
@@ -63,6 +63,10 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
   const [waSelectedIds, setWaSelectedIds] = useState<Set<string>>(new Set());
   const [isWaImporting, setIsWaImporting] = useState(false);
 
+  // Google Calendar state
+  const [gcalStatus, setGcalStatus] = useState<{ connected: boolean; autoSync: boolean } | null>(null)
+  const [isGcalDisconnecting, setIsGcalDisconnecting] = useState(false)
+
   // Edit contact state
   const [showEditContactModal, setShowEditContactModal] = useState(false);
   const [isSavingContact, setIsSavingContact] = useState(false);
@@ -116,7 +120,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
     setIsGeneratingSummary(false);
   };
 
-  // Fetch messaging accounts on user profile
+  // Fetch messaging accounts + Google Calendar status on user profile
   useEffect(() => {
     if (!selectedContact) {
       messagingApi.listAccounts().then(res => {
@@ -125,8 +129,24 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
       messagingApi.whatsappStatus().then(res => {
         if (res.data) setWaStatus({ status: res.data.status, phoneNumber: res.data.phoneNumber });
       });
+      googleCalendarApi.getStatus().then(res => {
+        if (res.data) setGcalStatus(res.data);
+      });
     }
   }, [selectedContact]);
+
+  // Check for Google Calendar OAuth redirect result
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('gcal_connected') === 'true') {
+      setGcalStatus({ connected: true, autoSync: true });
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    if (params.get('gcal_error')) {
+      console.error('Google Calendar connect error:', params.get('gcal_error'));
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   // LINE Linking modal countdown
   useEffect(() => {
@@ -263,6 +283,28 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
       const freshContacts = await messagingApi.whatsappContacts();
       if (freshContacts.data) setWaContacts(freshContacts.data);
     }
+  };
+
+  // Google Calendar handlers
+  const handleGcalConnect = async () => {
+    const res = await googleCalendarApi.getConnectUrl();
+    if (res.data?.url) {
+      window.location.href = res.data.url;
+    }
+  };
+
+  const handleGcalDisconnect = async () => {
+    setIsGcalDisconnecting(true);
+    await googleCalendarApi.disconnect();
+    setGcalStatus({ connected: false, autoSync: false });
+    setIsGcalDisconnecting(false);
+  };
+
+  const handleGcalAutoSyncToggle = async () => {
+    if (!gcalStatus) return;
+    const newVal = !gcalStatus.autoSync;
+    const res = await googleCalendarApi.updateSettings({ autoSync: newVal });
+    if (res.data) setGcalStatus({ ...gcalStatus, autoSync: res.data.autoSync });
   };
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -1443,6 +1485,77 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
               <p className="text-xs text-gray-500 mt-3 flex items-start gap-1.5">
                 <span className="material-symbols-outlined text-[14px] mt-0.5">info</span>
                 {t('messaging.hint', 'Connect messaging apps to add contacts by sending business cards or descriptions to the bot.')}
+              </p>
+            </div>
+
+            {/* Google Calendar Integration */}
+            <div className="bg-surface-card p-5 rounded-2xl shadow-sm border border-white/5">
+              <h3 className="font-bold text-xs text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-blue-400 text-[16px]">calendar_month</span>
+                Google Calendar
+              </h3>
+
+              {!gcalStatus?.connected ? (
+                <div className="space-y-3">
+                  <p className="text-xs text-gray-400">
+                    Connect Google Calendar to automatically sync reminders and meeting follow-ups as calendar events.
+                  </p>
+                  <button
+                    onClick={handleGcalConnect}
+                    className="w-full py-2.5 rounded-xl bg-blue-500/20 text-blue-400 text-sm font-bold border border-blue-500/30 hover:bg-blue-500/30 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">link</span>
+                    Connect Google Calendar
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5">
+                    <div className="flex items-center gap-3">
+                      <div className="size-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-blue-400 text-[20px]">calendar_month</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-white">Google Calendar</p>
+                        <p className="text-xs text-green-400">Connected</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleGcalDisconnect}
+                      disabled={isGcalDisconnecting}
+                      className="px-3 py-1.5 rounded-lg bg-red-900/20 text-red-400 text-xs font-bold border border-red-800/30 hover:bg-red-900/30 disabled:opacity-50"
+                    >
+                      {isGcalDisconnecting ? '...' : 'Disconnect'}
+                    </button>
+                  </div>
+
+                  {/* Auto-sync toggle */}
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5">
+                    <div>
+                      <p className="text-sm font-medium text-white">Auto-sync reminders</p>
+                      <p className="text-xs text-gray-400">New reminders & follow-ups sync automatically</p>
+                    </div>
+                    <button
+                      onClick={handleGcalAutoSyncToggle}
+                      className={`relative w-12 h-6 rounded-full transition-colors ${
+                        gcalStatus.autoSync ? 'bg-blue-500' : 'bg-gray-600'
+                      }`}
+                    >
+                      <div
+                        className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                          gcalStatus.autoSync ? 'translate-x-6' : 'translate-x-0.5'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <p className="text-xs text-gray-500 mt-3 flex items-start gap-1.5">
+                <span className="material-symbols-outlined text-[14px] mt-0.5">info</span>
+                {gcalStatus?.connected
+                  ? 'Individual reminders can also be added/removed from calendar in the notification panel.'
+                  : 'Reminders and meeting follow-up action items will appear as events in your primary Google Calendar.'}
               </p>
             </div>
 
