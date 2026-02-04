@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { sql, generateId } from '../db/postgres.js'
 import { authMiddleware } from '../middleware/auth.js'
+import { sendTeamInviteEmail } from '../utils/email.js'
 
 const teams = new Hono()
 
@@ -182,8 +183,36 @@ teams.post('/:id/members', async (c) => {
     SELECT id FROM users WHERE email = ${body.email}
   `
 
+  const role = body.role || 'member'
+
   if (!targetUser) {
-    return c.json({ error: 'User not found with that email' }, 404)
+    // User not registered — send invite email
+    // Check if invite already pending
+    const [existingInvite] = await sql`
+      SELECT * FROM team_invites WHERE team_id = ${id} AND email = ${body.email} AND status = 'pending'
+    `
+
+    if (existingInvite) {
+      return c.json({ error: 'An invitation has already been sent to this email' }, 409)
+    }
+
+    const inviteId = generateId()
+    await sql`
+      INSERT INTO team_invites (id, team_id, email, role, invited_by_id)
+      VALUES (${inviteId}, ${id}, ${body.email}, ${role}, ${userId})
+    `
+
+    // Get inviter name and team name for the email
+    const [inviter] = await sql<{ name: string }[]>`SELECT name FROM users WHERE id = ${userId}`
+    const [team] = await sql<{ name: string }[]>`SELECT name FROM teams WHERE id = ${id}`
+
+    try {
+      await sendTeamInviteEmail(body.email, team?.name || 'a team', inviter?.name || 'Someone')
+    } catch (emailErr) {
+      console.error('Failed to send invite email:', emailErr)
+    }
+
+    return c.json({ data: { invited: true, email: body.email, role } }, 201)
   }
 
   // Check if already a member
@@ -196,13 +225,12 @@ teams.post('/:id/members', async (c) => {
   }
 
   // Add member
-  const role = body.role || 'member'
   await sql`
     INSERT INTO team_members (team_id, user_id, role)
     VALUES (${id}, ${targetUser.id}, ${role})
   `
 
-  return c.json({ message: 'Member added', userId: targetUser.id, role }, 201)
+  return c.json({ data: { userId: targetUser.id, role } }, 201)
 })
 
 // Remove team member

@@ -392,5 +392,17 @@
       "reconnecting": "Reconectando...",
       "rateLimitWarning": "WhatsApp limita los intentos de emparejamiento. Si tu código es rechazado, espera entre 15 y 30 minutos antes de intentarlo de nuevo."
     }
+  },
+  "landing": {
+    "tagline": "Tu red profesional, simplificada",
+    "featureScanning": "Escaneo de Tarjetas",
+    "featureScanningDesc": "Escanea y guarda contactos al instante con tu cámara",
+    "featureAI": "Seguimientos con IA",
+    "featureAIDesc": "Recibe recordatorios inteligentes y redacta mensajes personalizados",
+    "featureNetwork": "Visualización de Red",
+    "featureNetworkDesc": "Visualiza tus conexiones y descubre caminos",
+    "featureCalendar": "Sincronización con Google Calendar",
+    "featureCalendarDesc": "Sincroniza recordatorios y seguimientos como eventos del calendario",
+    "signIn": "Iniciar Sesión"
   }
 }

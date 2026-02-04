@@ -392,5 +392,17 @@
       "reconnecting": "Đang kết nối lại...",
       "rateLimitWarning": "WhatsApp giới hạn số lần ghép nối. Nếu mã bị từ chối, vui lòng đợi 15–30 phút trước khi thử lại."
     }
+  },
+  "landing": {
+    "tagline": "Mạng lưới chuyên nghiệp, đơn giản hóa",
+    "featureScanning": "Quét Danh Thiếp",
+    "featureScanningDesc": "Quét và lưu danh bạ ngay lập tức bằng camera",
+    "featureAI": "Theo Dõi Thông Minh AI",
+    "featureAIDesc": "Nhận nhắc nhở thông minh và soạn tin nhắn cá nhân hóa",
+    "featureNetwork": "Trực Quan Hóa Mạng Lưới",
+    "featureNetworkDesc": "Xem bản đồ kết nối và khám phá đường dẫn",
+    "featureCalendar": "Đồng Bộ Google Calendar",
+    "featureCalendarDesc": "Đồng bộ nhắc nhở và theo dõi thành sự kiện lịch",
+    "signIn": "Đăng Nhập"
   }
 }

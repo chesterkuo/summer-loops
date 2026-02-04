@@ -392,5 +392,17 @@
       "reconnecting": "再接続中...",
       "rateLimitWarning": "WhatsAppはペアリングの試行回数を制限しています。コードが拒否された場合は、15～30分待ってから再試行してください。"
     }
+  },
+  "landing": {
+    "tagline": "プロフェッショナルな人脈を、シンプルに",
+    "featureScanning": "名刺スキャン",
+    "featureScanningDesc": "カメラで名刺を瞬時にスキャンして連絡先を保存",
+    "featureAI": "AIスマートフォローアップ",
+    "featureAIDesc": "スマートリマインダーとパーソナライズされたメッセージを作成",
+    "featureNetwork": "ネットワーク可視化",
+    "featureNetworkDesc": "人脈マップを表示してつながりを発見",
+    "featureCalendar": "Googleカレンダー同期",
+    "featureCalendarDesc": "リマインダーとフォローアップをカレンダーイベントに同期",
+    "signIn": "ログイン"
   }
 }

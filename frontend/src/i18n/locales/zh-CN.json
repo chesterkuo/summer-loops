@@ -655,5 +655,17 @@
       "reconnecting": "正在重新连接...",
       "rateLimitWarning": "WhatsApp 限制配对尝试次数。如果您的配对码被拒绝，请等待 15–30 分钟后再试。"
     }
+  },
+  "landing": {
+    "tagline": "您的专业人脉，化繁为简",
+    "featureScanning": "名片扫描",
+    "featureScanningDesc": "用相机即时扫描并保存联系人",
+    "featureAI": "AI 智能跟进",
+    "featureAIDesc": "获取智能提醒并撰写个性化消息",
+    "featureNetwork": "人脉可视化",
+    "featureNetworkDesc": "查看人脉关系图并发现连接路径",
+    "featureCalendar": "Google 日历同步",
+    "featureCalendarDesc": "将提醒和跟进事项同步至日历活动",
+    "signIn": "登录"
   }
 }

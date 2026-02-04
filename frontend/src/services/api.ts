@@ -807,7 +807,7 @@ export const teamsApi = {
   },
 
   async addMember(teamId: string, data: { email: string; role?: 'admin' | 'member' }) {
-    return apiFetch<{ userId: string; role: string }>(`/teams/${teamId}/members`, {
+    return apiFetch<{ userId?: string; role: string; invited?: boolean; email?: string }>(`/teams/${teamId}/members`, {
       method: 'POST',
       body: JSON.stringify(data),
     })

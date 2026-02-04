@@ -11,6 +11,7 @@ import CompanyDetail from './screens/CompanyDetail';
 import Search from './screens/Search';
 import Teams from './screens/Teams';
 import Login from './screens/Login';
+import LandingPage from './screens/LandingPage';
 import TermsOfService from './screens/TermsOfService';
 import PrivacyPolicy from './screens/PrivacyPolicy';
 import Support from './screens/Support';
@@ -82,6 +83,7 @@ const MainApp: React.FC = () => {
 const App: React.FC = () => {
   return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
       <Route path="/tos" element={<TermsOfService />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/support" element={<Support />} />

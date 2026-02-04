@@ -392,5 +392,17 @@
       "reconnecting": "Reconnexion...",
       "rateLimitWarning": "WhatsApp limite les tentatives d'appairage. Si votre code est rejeté, veuillez attendre 15 à 30 minutes avant de réessayer."
     }
+  },
+  "landing": {
+    "tagline": "Votre réseau professionnel, simplifié",
+    "featureScanning": "Scan de Cartes de Visite",
+    "featureScanningDesc": "Scannez et enregistrez vos contacts instantanément avec votre caméra",
+    "featureAI": "Suivis Intelligents par IA",
+    "featureAIDesc": "Recevez des rappels intelligents et rédigez des messages personnalisés",
+    "featureNetwork": "Visualisation du Réseau",
+    "featureNetworkDesc": "Visualisez vos connexions et découvrez des chemins",
+    "featureCalendar": "Synchronisation Google Agenda",
+    "featureCalendarDesc": "Synchronisez rappels et suivis en événements d'agenda",
+    "signIn": "Se Connecter"
   }
 }

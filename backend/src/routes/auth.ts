@@ -7,6 +7,32 @@ import type { User } from '../types/index.js'
 
 const auth = new Hono()
 
+// Accept any pending team invites for this email
+async function acceptPendingInvites(userId: string, email: string): Promise<void> {
+  try {
+    const invites = await sql<{ id: string; team_id: string; role: string }[]>`
+      SELECT id, team_id, role FROM team_invites
+      WHERE email = ${email} AND status = 'pending'
+    `
+
+    for (const invite of invites) {
+      // Check not already a member
+      const [existing] = await sql`
+        SELECT 1 FROM team_members WHERE team_id = ${invite.team_id} AND user_id = ${userId}
+      `
+      if (!existing) {
+        await sql`
+          INSERT INTO team_members (team_id, user_id, role)
+          VALUES (${invite.team_id}, ${userId}, ${invite.role})
+        `
+      }
+      await sql`UPDATE team_invites SET status = 'accepted' WHERE id = ${invite.id}`
+    }
+  } catch (err) {
+    console.error('Error accepting pending invites:', err)
+  }
+}
+
 // Environment variables
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET
@@ -85,6 +111,9 @@ auth.post('/signup', async (c) => {
 
     const [user] = await sql<User[]>`SELECT * FROM users WHERE id = ${userId}`
 
+    // Accept any pending team invites
+    await acceptPendingInvites(userId, body.email.toLowerCase())
+
     // Generate JWT token
     const token = await generateToken({
       userId: user.id,
@@ -141,6 +170,9 @@ auth.post('/login', async (c) => {
     if (!isValid) {
       return c.json({ error: 'Invalid email or password' }, 401)
     }
+
+    // Accept any pending team invites
+    await acceptPendingInvites(user.id, user.email)
 
     // Generate JWT token
     const token = await generateToken({
@@ -260,6 +292,9 @@ auth.get('/google/callback', async (c) => {
 
       ;[user] = await sql<User[]>`SELECT * FROM users WHERE id = ${user.id}`
     }
+
+    // Accept any pending team invites
+    await acceptPendingInvites(user.id, user.email)
 
     // Generate JWT token
     const token = await generateToken({

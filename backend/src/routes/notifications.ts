@@ -212,7 +212,7 @@ notifications.patch('/:id', async (c) => {
   // Execute update based on what fields are provided
   await sql`
     UPDATE notifications SET
-      contact_id = COALESCE(${updateValues.contact_id ?? null}::uuid, contact_id),
+      contact_id = COALESCE(${updateValues.contact_id ?? null}, contact_id),
       note = COALESCE(${updateValues.note ?? null}, note),
       remind_at = COALESCE(${updateValues.remind_at ?? null}::timestamptz, remind_at),
       status = COALESCE(${updateValues.status ?? null}, status),

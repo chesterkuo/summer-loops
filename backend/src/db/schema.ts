@@ -269,6 +269,27 @@ export const introductionRequests = pgTable(
   })
 )
 
+// ============ TEAM INVITES ============
+export const teamInvites = pgTable(
+  'team_invites',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('team_id')
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+    role: text('role').notNull().default('member'),
+    invitedById: text('invited_by_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    status: text('status').notNull().default('pending'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    teamEmailIdx: index('idx_team_invites_email').on(table.teamId, table.email),
+  })
+)
+
 // ============ NOTIFICATIONS ============
 export const notifications = pgTable(
   'notifications',

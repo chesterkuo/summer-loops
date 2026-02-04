@@ -655,5 +655,17 @@
       "reconnecting": "Reconnecting...",
       "rateLimitWarning": "WhatsApp limits pairing attempts. If your code is rejected, please wait 15–30 minutes before trying again."
     }
+  },
+  "landing": {
+    "tagline": "Your professional network, simplified",
+    "featureScanning": "Business Card Scanning",
+    "featureScanningDesc": "Scan and save contacts instantly with your camera",
+    "featureAI": "AI-Powered Follow-Ups",
+    "featureAIDesc": "Get smart reminders and draft personalized messages",
+    "featureNetwork": "Network Visualization",
+    "featureNetworkDesc": "See your connections mapped out and discover paths",
+    "featureCalendar": "Google Calendar Sync",
+    "featureCalendarDesc": "Sync reminders and follow-ups as calendar events",
+    "signIn": "Sign In"
   }
 }

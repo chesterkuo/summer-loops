@@ -65,7 +65,7 @@ export async function validateAndLinkAccount(
     // Already linked to different account — update
     await sql`
       UPDATE messaging_accounts
-      SET user_id = ${linkingToken.user_id}, display_name = ${displayName || existing.display_name || null}, is_active = true
+      SET user_id = ${linkingToken.user_id}, display_name = ${displayName ?? existing.display_name ?? null}, is_active = true
       WHERE id = ${existing.id}
     `
     return { success: true, userId: linkingToken.user_id }
@@ -75,7 +75,7 @@ export async function validateAndLinkAccount(
   const id = generateId()
   await sql`
     INSERT INTO messaging_accounts (id, user_id, platform, platform_user_id, display_name)
-    VALUES (${id}, ${linkingToken.user_id}, ${platform}, ${platformUserId}, ${displayName || null})
+    VALUES (${id}, ${linkingToken.user_id}, ${platform}, ${platformUserId}, ${displayName ?? null})
   `
 
   return { success: true, userId: linkingToken.user_id }

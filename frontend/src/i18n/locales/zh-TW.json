@@ -655,5 +655,17 @@
       "reconnecting": "正在重新連接...",
       "rateLimitWarning": "WhatsApp 限制配對嘗試次數。如果您的配對碼被拒絕，請等待 15–30 分鐘後再試。"
     }
+  },
+  "landing": {
+    "tagline": "您的專業人脈，化繁為簡",
+    "featureScanning": "名片掃描",
+    "featureScanningDesc": "用相機即時掃描並儲存聯絡人",
+    "featureAI": "AI 智慧跟進",
+    "featureAIDesc": "取得智慧提醒並撰寫個人化訊息",
+    "featureNetwork": "人脈視覺化",
+    "featureNetworkDesc": "查看人脈關係圖並發現連結路徑",
+    "featureCalendar": "Google 日曆同步",
+    "featureCalendarDesc": "將提醒和跟進事項同步至日曆活動",
+    "signIn": "登入"
   }
 }

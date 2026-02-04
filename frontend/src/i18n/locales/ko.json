@@ -392,5 +392,17 @@
       "reconnecting": "재연결 중...",
       "rateLimitWarning": "WhatsApp은 페어링 시도 횟수를 제한합니다. 코드가 거부되면 15~30분 후에 다시 시도하세요."
     }
+  },
+  "landing": {
+    "tagline": "프로페셔널 인맥을 간편하게",
+    "featureScanning": "명함 스캔",
+    "featureScanningDesc": "카메라로 즉시 스캔하여 연락처 저장",
+    "featureAI": "AI 스마트 팔로업",
+    "featureAIDesc": "스마트 리마인더와 맞춤 메시지 작성",
+    "featureNetwork": "네트워크 시각화",
+    "featureNetworkDesc": "인맥 지도를 확인하고 연결 경로 발견",
+    "featureCalendar": "Google 캘린더 동기화",
+    "featureCalendarDesc": "리마인더와 팔로업을 캘린더 이벤트로 동기화",
+    "signIn": "로그인"
   }
 }
