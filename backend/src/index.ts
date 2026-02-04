@@ -33,7 +33,7 @@ initGemini()
 // Middleware
 app.use('*', logger())
 app.use('*', cors({
-  origin: ['http://localhost:5173', 'https://mywarmly.app', 'capacitor://localhost', 'ionic://localhost'],
+  origin: ['http://localhost:5173', 'https://mywarmly.app', 'capacitor://localhost', 'ionic://localhost', 'https://localhost'],
   credentials: true,
 }))
 

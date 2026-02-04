@@ -5,12 +5,23 @@
   "title": "Warmly - Personal CRM",
   "description": "Personal CRM for meaningful connections",
   "version": "1.2.0",
-  "build": "1",
+  "build": "16",
   "author": "Warmly Team",
   "email": "chester.kuo1978@gmail.com",
 
   "release": "release",
-  "platform": ["ios"],
+
+  "androidPackageType": "apk",
+  "androidKeystore": "certificates/android.p12",
+  "androidAlias": "key0",
+  "androidKeystorePassword": "8ephegcn",
+  "androidAliasPassword": "8ephegcn",
+
+  "android": {
+    "minSdkVersion": "22",
+    "targetSdkVersion": "34",
+    "versionCode": "16"
+  },
 
   "iosPackageType": "app-store",
   "iosDistP12": "certificates/ios_distribution.p12",
@@ -20,7 +31,7 @@
   "ios": {
     "developmentTeam": "76TVWYJ6PL",
     "scheme": "App",
-    "buildNumber": "1"
+    "buildNumber": "16"
   },
 
   "iosUpload": true,

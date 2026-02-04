@@ -1,6 +1,8 @@
 #!/bin/bash
-# Build script for VoltBuilder iOS deployment
-# Creates a zip package ready for upload to volt.build
+# Build script for VoltBuilder iOS & Android deployment
+# Creates TWO zip packages ready for upload to volt.build:
+#   - iOS: includes Capacitor ios/ project directory
+#   - Android: pure Cordova structure with www/ (required for icon generation)
 
 set -e
 
@@ -10,7 +12,7 @@ PROJECT_DIR="$(dirname "$FRONTEND_DIR")"
 
 cd "$FRONTEND_DIR"
 
-echo "=== Warmly VoltBuilder Build Script ==="
+echo "=== Warmly VoltBuilder Build Script (iOS + Android) ==="
 echo ""
 
 # Step 0: Auto-increment build number
@@ -19,8 +21,10 @@ CURRENT_BUILD=$(grep -o '"build": "[0-9]*"' voltbuilder.json | grep -o '[0-9]*')
 NEW_BUILD=$((CURRENT_BUILD + 1))
 sed -i "s/\"build\": \"$CURRENT_BUILD\"/\"build\": \"$NEW_BUILD\"/" voltbuilder.json
 sed -i "s/\"buildNumber\": \"$CURRENT_BUILD\"/\"buildNumber\": \"$NEW_BUILD\"/" voltbuilder.json
-# Also update ios-CFBundleVersion in config.xml (handles multi-line format)
+sed -i "s/\"versionCode\": \"$CURRENT_BUILD\"/\"versionCode\": \"$NEW_BUILD\"/" voltbuilder.json
+# Also update ios-CFBundleVersion and android-versionCode in config.xml
 sed -i "s/ios-CFBundleVersion=\"[0-9]*\"/ios-CFBundleVersion=\"$NEW_BUILD\"/" config.xml
+sed -i "s/android-versionCode=\"[0-9]*\"/android-versionCode=\"$NEW_BUILD\"/" config.xml
 # Update CURRENT_PROJECT_VERSION in Xcode project
 if [ -f "ios/App/App.xcodeproj/project.pbxproj" ]; then
     sed -i "s/CURRENT_PROJECT_VERSION = [0-9]*;/CURRENT_PROJECT_VERSION = $NEW_BUILD;/g" ios/App/App.xcodeproj/project.pbxproj
@@ -35,8 +39,8 @@ if [ ! -f "voltbuilder.json" ]; then
     exit 1
 fi
 
-if [ ! -f "capacitor.config.json" ]; then
-    echo "Error: capacitor.config.json not found"
+if [ ! -f "config.xml" ]; then
+    echo "Error: config.xml not found"
     exit 1
 fi
 
@@ -77,87 +81,125 @@ else
     echo "  Warning: No icons to copy."
 fi
 
-# Step 5: Sync iOS project
+# Step 5: Sync iOS platform
 echo ""
-echo "[5/6] Syncing iOS project..."
+echo "[5/6] Syncing iOS platform..."
+
 if [ ! -d "ios" ]; then
     echo "  Adding iOS platform..."
-    ./node_modules/.bin/cap add ios
+    ./node_modules/.bin/cap add ios 2>/dev/null || true
 fi
-./node_modules/.bin/cap sync ios
-echo "  iOS project synced."
+if [ -d "ios" ]; then
+    ./node_modules/.bin/cap sync ios
+    echo "  iOS project synced."
+    # Copy app icon to Xcode assets
+    if [ -f "public/icons/icon-1024.png" ] && [ -d "ios/App/App/Assets.xcassets/AppIcon.appiconset" ]; then
+        cp public/icons/icon-1024.png ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
+    fi
+fi
 
-# Copy app icon to Xcode assets
-cp public/icons/icon-1024.png ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
-
-# Step 6: Create VoltBuilder package
+# Step 6: Create VoltBuilder packages
 echo ""
-echo "[6/6] Creating VoltBuilder package..."
+echo "[6/6] Creating VoltBuilder packages..."
 
-PACKAGE_NAME="warmly-voltbuilder-$(date +%Y%m%d-%H%M%S).zip"
-PACKAGE_PATH="$PROJECT_DIR/$PACKAGE_NAME"
-
-# Create VoltBuilder-specific package.json (no TypeScript build)
-cat > package.voltbuilder.json << 'PKGJSON'
-{
-  "name": "warmly-mobile",
-  "version": "1.0.0",
-  "description": "Warmly - Personal CRM",
-  "scripts": {
-    "build": "echo 'Build handled by Vite'"
-  },
-  "dependencies": {
-    "@capacitor/android": "^7.4.4",
-    "@capacitor/core": "^7.4.4",
-    "@capacitor/ios": "^7.4.4",
-    "@capacitor/splash-screen": "^7.0.3",
-    "@capacitor/status-bar": "^7.0.3"
-  },
-  "devDependencies": {
-    "@capacitor/cli": "^7.4.4"
-  }
-}
-PKGJSON
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 
 # Create certificates directory and copy certificates
 mkdir -p certificates
-if [ -f "$PROJECT_DIR/certificates/ios_distribution.p12" ]; then
-    cp "$PROJECT_DIR/certificates/ios_distribution.p12" certificates/
+
+# iOS certificates
+if [ -f "$PROJECT_DIR/ios_distribution.p12" ]; then
+    cp "$PROJECT_DIR/ios_distribution.p12" certificates/
     echo "  Including iOS distribution certificate."
 fi
-if [ -f "$PROJECT_DIR/certificates/MyWarmly_App_profile.mobileprovision" ]; then
-    cp "$PROJECT_DIR/certificates/MyWarmly_App_profile.mobileprovision" certificates/
-    echo "  Including provisioning profile."
+if [ -f "$PROJECT_DIR/MyWarmly_App_profile.mobileprovision" ]; then
+    cp "$PROJECT_DIR/MyWarmly_App_profile.mobileprovision" certificates/
+    echo "  Including iOS provisioning profile."
 fi
 
-# Create the zip with required structure (matching reference project)
-# Use VoltBuilder-specific package.json
-zip -r "$PACKAGE_PATH" \
-    voltbuilder.json \
-    capacitor.config.json \
-    config.xml \
-    dist/ \
-    ios/ \
-    certificates/ \
+# Android keystore
+if [ -f "$PROJECT_DIR/android.p12" ]; then
+    cp "$PROJECT_DIR/android.p12" certificates/
+    echo "  Including Android keystore."
+else
+    echo "  Warning: android.p12 not found at $PROJECT_DIR/android.p12"
+fi
+
+# --- iOS Package (Capacitor structure with ios/ directory) ---
+IOS_PACKAGE_NAME="warmly-ios-${TIMESTAMP}.zip"
+IOS_PACKAGE_PATH="$PROJECT_DIR/$IOS_PACKAGE_NAME"
+
+IOS_ZIP_CONTENTS=(
+    voltbuilder.json
+    config.xml
+    dist/
+    certificates/
+    resources/
+)
+
+if [ -d "ios" ]; then
+    IOS_ZIP_CONTENTS+=(ios/)
+fi
+
+if [ -f "capacitor.config.json" ]; then
+    IOS_ZIP_CONTENTS+=(capacitor.config.json)
+fi
+
+zip -r "$IOS_PACKAGE_PATH" \
+    "${IOS_ZIP_CONTENTS[@]}" \
     -x "*.DS_Store" \
     -x "__MACOSX/*" \
     -x "ios/App/Pods/*" \
     -x "*.xcworkspace/xcuserdata/*"
 
-# Add the VoltBuilder package.json (renamed from package.voltbuilder.json)
-zip -j "$PACKAGE_PATH" package.voltbuilder.json
-# Rename inside zip
-printf "@ package.voltbuilder.json\n@=package.json\n" | zipnote -w "$PACKAGE_PATH"
+echo "  iOS package created: $IOS_PACKAGE_NAME"
+
+# --- Android Package (pure Cordova structure with www/) ---
+ANDROID_PACKAGE_NAME="warmly-android-${TIMESTAMP}.zip"
+ANDROID_PACKAGE_PATH="$PROJECT_DIR/$ANDROID_PACKAGE_NAME"
+
+# Create temporary www/ directory (Cordova standard)
+rm -rf /tmp/warmly-android-build
+mkdir -p /tmp/warmly-android-build
+cp -r dist/* /tmp/warmly-android-build/
+
+# Build the Android zip with www/ instead of dist/
+# We need to create this from a temp directory to get the www/ structure
+ANDROID_STAGING="/tmp/warmly-android-staging"
+rm -rf "$ANDROID_STAGING"
+mkdir -p "$ANDROID_STAGING"
+cp -r dist "$ANDROID_STAGING/www"
+cp voltbuilder.json "$ANDROID_STAGING/"
+cp config.xml "$ANDROID_STAGING/"
+cp -r resources "$ANDROID_STAGING/"
+cp -r certificates "$ANDROID_STAGING/"
+
+cd "$ANDROID_STAGING"
+zip -r "$ANDROID_PACKAGE_PATH" \
+    voltbuilder.json \
+    config.xml \
+    www/ \
+    certificates/ \
+    resources/ \
+    -x "*.DS_Store" \
+    -x "__MACOSX/*"
+
+cd "$FRONTEND_DIR"
+rm -rf "$ANDROID_STAGING" /tmp/warmly-android-build
+
+echo "  Android package created: $ANDROID_PACKAGE_NAME"
 
 # Clean up
-rm -rf certificates package.voltbuilder.json
+rm -rf certificates
 
 echo ""
 echo "=== Build Complete ==="
 echo ""
-echo "Package created: $PACKAGE_PATH"
+echo "Packages created:"
+echo "  iOS:     $PROJECT_DIR/$IOS_PACKAGE_NAME"
+echo "  Android: $PROJECT_DIR/$ANDROID_PACKAGE_NAME"
 echo ""
 echo "Next steps:"
 echo "  1. Go to https://volt.build"
-echo "  2. Upload the package: $PACKAGE_NAME"
-echo "  3. Build and download the .ipa file"
+echo "  2. Upload iOS package for iOS build"
+echo "  3. Upload Android package for Android build"

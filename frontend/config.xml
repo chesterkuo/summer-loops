@@ -1,13 +1,17 @@
 <?xml version='1.0' encoding='utf-8'?>
 <widget id="com.mywarmly.app"
         version="1.2.0"
-        ios-CFBundleVersion="1"
+        ios-CFBundleVersion="16"
+        android-versionCode="16"
         xmlns="http://www.w3.org/ns/widgets"
         xmlns:cdv="http://cordova.apache.org/ns/1.0">
     <name>Warmly</name>
     <description>Personal CRM for meaningful connections</description>
     <author email="support@mywarmly.app" href="https://mywarmly.app">Warmly Team</author>
     <content src="index.html" />
+
+    <!-- Global Icon Template (used by VoltBuilder/cordova-res to generate all platform icons) -->
+    <icon src="resources/iconTemplate.png" />
 
     <!-- Global Preferences -->
     <preference name="DisallowOverscroll" value="true" />
@@ -62,6 +66,27 @@
         <icon src="public/icons/icon-512.png" width="512" height="512" />
         <icon src="public/icons/icon-1024.png" width="1024" height="1024" />
     </platform>
+
+    <!-- Android Platform Preferences -->
+    <platform name="android">
+        <preference name="BackgroundColor" value="#FF122017" />
+        <preference name="android-targetSdkVersion" value="34" />
+        <preference name="android-compileSdkVersion" value="34" />
+        <preference name="android-minSdkVersion" value="22" />
+        <preference name="StatusBarOverlaysWebView" value="false" />
+        <preference name="StatusBarBackgroundColor" value="#122017" />
+        <preference name="StatusBarStyle" value="lightcontent" />
+
+        <!-- Android 12+ Splash Screen -->
+        <preference name="AndroidWindowSplashScreenBackground" value="#122017" />
+        <preference name="AndroidWindowSplashScreenAnimatedIcon" value="resources/splashTemplate.png" />
+
+        <!-- Android Icons -->
+        <icon src="resources/android/icon-1024.png" width="1024" height="1024" />
+    </platform>
+
+    <!-- Cordova Engines -->
+    <engine name="android" spec="12.0.1" />
 
     <!-- Access and Navigation -->
     <access origin="*" />

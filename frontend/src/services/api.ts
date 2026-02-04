@@ -1,10 +1,11 @@
 // API Client for Warmly Backend
 
 // Detect native vs web environment for API base URL
+// iOS Capacitor uses capacitor://localhost, Android uses https://localhost
 const isNative = typeof window !== 'undefined' && (
   window.location.protocol === 'capacitor:' ||
   window.location.protocol === 'file:' ||
-  window.location.hostname === 'localhost' && window.location.port === ''
+  (window.location.hostname === 'localhost' && window.location.port === '')
 );
 
 const API_BASE = isNative
