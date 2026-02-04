@@ -224,8 +224,8 @@ paths.put('/requests/:id', async (c) => {
 
   await sql`
     UPDATE introduction_requests SET
-      status = COALESCE(${hasStatus ? body.status : null}, status),
-      generated_message = ${hasMessage ? (body.generatedMessage || null) : existing.generated_message},
+      status = COALESCE(${hasStatus ? body.status ?? null : null}, status),
+      generated_message = ${hasMessage ? (body.generatedMessage || null) : existing.generatedMessage},
       updated_at = ${now}
     WHERE id = ${id}
   `

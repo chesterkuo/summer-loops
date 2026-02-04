@@ -386,7 +386,7 @@ ai.post('/meeting/brief/:contactId', async (c) => {
   `
 
   // Find mutual contacts (contacts that share a relationship with this contact)
-  const mutualContacts = await sql<{ name: string; company: string | null }[]>`
+  const mutualContacts = await sql<{ name: string; company?: string }[]>`
     SELECT DISTINCT c.name, c.company FROM relationships r
     JOIN contacts c ON c.id = r.contact_a_id
     WHERE r.user_id = ${userId}

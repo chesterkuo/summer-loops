@@ -157,9 +157,9 @@ interactions.put('/:id', async (c) => {
   // Perform update with explicit fields
   await sql`
     UPDATE interactions SET
-      type = COALESCE(${hasType ? body.type : null}, type),
+      type = COALESCE(${hasType ? body.type ?? null : null}, type),
       notes = ${hasNotes ? (body.notes || null) : existing.notes},
-      occurred_at = COALESCE(${hasOccurredAt ? body.occurredAt : null}::timestamptz, occurred_at)
+      occurred_at = COALESCE(${hasOccurredAt ? body.occurredAt ?? null : null}::timestamptz, occurred_at)
     WHERE id = ${id}
   `
 

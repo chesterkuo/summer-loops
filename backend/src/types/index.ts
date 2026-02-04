@@ -165,6 +165,7 @@ export interface Interaction {
   userId: string
   contactId: string
   type: 'meeting' | 'call' | 'message' | 'email' | 'other'
+  title: string | null
   notes: string | null
   occurredAt: string
   createdAt: string
@@ -173,6 +174,7 @@ export interface Interaction {
 export interface CreateInteractionRequest {
   contactId: string
   type: 'meeting' | 'call' | 'message' | 'email' | 'other'
+  title?: string
   notes?: string
   occurredAt: string
 }
@@ -231,6 +233,7 @@ export interface Notification {
   status: 'pending' | 'done'
   createdAt: string
   completedAt: string | null
+  googleEventId: string | null
 }
 
 export interface CreateNotificationRequest {

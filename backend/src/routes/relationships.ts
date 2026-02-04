@@ -277,10 +277,10 @@ relationships.put('/:id', async (c) => {
 
   await sql`
     UPDATE relationships SET
-      relationship_type = ${hasRelType ? (body.relationshipType || null) : existing.relationship_type},
-      strength = COALESCE(${hasStrength ? body.strength : null}, strength),
-      how_met = ${hasHowMet ? (body.howMet || null) : existing.how_met},
-      verified = COALESCE(${hasVerified ? body.verified : null}, verified),
+      relationship_type = ${hasRelType ? (body.relationshipType || null) : existing.relationshipType},
+      strength = COALESCE(${hasStrength ? body.strength ?? null : null}, strength),
+      how_met = ${hasHowMet ? (body.howMet || null) : existing.howMet},
+      verified = COALESCE(${hasVerified ? body.verified ?? null : null}, verified),
       updated_at = ${now}
     WHERE id = ${id}
   `

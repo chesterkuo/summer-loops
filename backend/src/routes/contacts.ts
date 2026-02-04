@@ -197,21 +197,21 @@ contacts.put('/:id', async (c) => {
 
   await sql`
     UPDATE contacts SET
-      name = COALESCE(${hasName ? body.name : null}, name),
+      name = COALESCE(${hasName ? body.name ?? null : null}, name),
       company = ${hasCompany ? (body.company || null) : existing.company},
       title = ${hasTitle ? (body.title || null) : existing.title},
       email = ${hasEmail ? (body.email || null) : existing.email},
       phone = ${hasPhone ? (body.phone || null) : existing.phone},
-      linkedin_url = ${hasLinkedinUrl ? (body.linkedinUrl || null) : existing.linkedin_url},
+      linkedin_url = ${hasLinkedinUrl ? (body.linkedinUrl || null) : existing.linkedinUrl},
       notes = ${hasNotes ? (body.notes || null) : existing.notes},
-      ai_summary = ${hasAiSummary ? (body.aiSummary || null) : existing.ai_summary},
-      line_id = ${hasLineId ? (body.lineId || null) : existing.line_id},
-      telegram_username = ${hasTelegramUsername ? (body.telegramUsername || null) : existing.telegram_username},
-      whatsapp_number = ${hasWhatsappNumber ? (body.whatsappNumber || null) : existing.whatsapp_number},
-      wechat_id = ${hasWechatId ? (body.wechatId || null) : existing.wechat_id},
-      twitter_handle = ${hasTwitterHandle ? (body.twitterHandle || null) : existing.twitter_handle},
-      facebook_url = ${hasFacebookUrl ? (body.facebookUrl || null) : existing.facebook_url},
-      instagram_handle = ${hasInstagramHandle ? (body.instagramHandle || null) : existing.instagram_handle},
+      ai_summary = ${hasAiSummary ? (body.aiSummary || null) : existing.aiSummary},
+      line_id = ${hasLineId ? (body.lineId || null) : existing.lineId},
+      telegram_username = ${hasTelegramUsername ? (body.telegramUsername || null) : existing.telegramUsername},
+      whatsapp_number = ${hasWhatsappNumber ? (body.whatsappNumber || null) : existing.whatsappNumber},
+      wechat_id = ${hasWechatId ? (body.wechatId || null) : existing.wechatId},
+      twitter_handle = ${hasTwitterHandle ? (body.twitterHandle || null) : existing.twitterHandle},
+      facebook_url = ${hasFacebookUrl ? (body.facebookUrl || null) : existing.facebookUrl},
+      instagram_handle = ${hasInstagramHandle ? (body.instagramHandle || null) : existing.instagramHandle},
       updated_at = ${now}
     WHERE id = ${id}
   `
