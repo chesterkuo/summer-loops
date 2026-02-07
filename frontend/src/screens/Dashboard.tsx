@@ -25,7 +25,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
   const { user } = useAuthStore();
   const { currentLocale } = useLocaleStore();
-  const { contacts, graphData, fetchContacts, fetchGraph, parseText, createContact, isLoading, setSelectedContact } = useContactStore();
+  const { contacts, totalContacts, graphData, fetchContacts, fetchGraph, parseText, createContact, isLoading, setSelectedContact } = useContactStore();
   const { activeCount, openPanel, fetchNotifications } = useNotificationStore();
 
   // Fetch contacts and notifications on mount
@@ -240,7 +240,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 </div>
               </div>
               <div className="mt-4">
-                <p className="text-2xl font-bold tracking-tight text-white">{contacts.length}</p>
+                <p className="text-2xl font-bold tracking-tight text-white">{totalContacts}</p>
                 <p className="text-xs font-medium text-text-muted">{t('dashboard.totalContacts')}</p>
               </div>
             </div>

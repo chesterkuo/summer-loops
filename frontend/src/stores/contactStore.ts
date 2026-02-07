@@ -10,6 +10,7 @@ interface IntroPathNode {
 
 interface ContactState {
   contacts: Contact[]
+  totalContacts: number  // Total count from API (not limited by pagination)
   selectedContact: Contact | null
   relationships: Relationship[]
   graphData: GraphData | null
@@ -20,10 +21,10 @@ interface ContactState {
   // Actions
   fetchContacts: (search?: string) => Promise<void>
   fetchContact: (id: string) => Promise<void>
-  createContact: (data: Partial<Contact>) => Promise<Contact | null>
+  createContact: (data: Partial<Contact> & { locale?: string }) => Promise<{ contact: Contact; invitationSent: boolean } | null>
   updateContact: (id: string, data: Partial<Contact>) => Promise<boolean>
   deleteContact: (id: string) => Promise<boolean>
-  scanCard: (imageBase64: string) => Promise<Partial<Contact> | null>
+  scanCard: (imageBase64: string) => Promise<Partial<Contact>[] | null>
   parseText: (text: string) => Promise<Partial<Contact> | null>
   fetchGraph: () => Promise<void>
   fetchRelationships: (contactId?: string) => Promise<void>
@@ -42,6 +43,7 @@ interface ContactState {
 
 export const useContactStore = create<ContactState>((set, get) => ({
   contacts: [],
+  totalContacts: 0,
   selectedContact: null,
   relationships: [],
   graphData: null,
@@ -54,7 +56,11 @@ export const useContactStore = create<ContactState>((set, get) => ({
     const result = await contactsApi.list({ search })
 
     if (result.data) {
-      set({ contacts: result.data, isLoading: false })
+      set({
+        contacts: result.data,
+        totalContacts: result.total || result.data.length,
+        isLoading: false
+      })
     } else {
       set({ error: result.error, isLoading: false })
     }
@@ -71,7 +77,7 @@ export const useContactStore = create<ContactState>((set, get) => ({
     }
   },
 
-  createContact: async (data: Partial<Contact>) => {
+  createContact: async (data: Partial<Contact> & { locale?: string }) => {
     set({ isLoading: true, error: null })
     const result = await contactsApi.create(data)
 
@@ -80,7 +86,7 @@ export const useContactStore = create<ContactState>((set, get) => ({
         contacts: [result.data!, ...state.contacts],
         isLoading: false,
       }))
-      return result.data
+      return { contact: result.data, invitationSent: result.invitationSent || false }
     } else {
       set({ error: result.error, isLoading: false })
       return null
@@ -127,7 +133,12 @@ export const useContactStore = create<ContactState>((set, get) => ({
 
     set({ isLoading: false })
     if (result.data) {
-      return result.data.contact
+      // Return array of contacts if multiple cards detected
+      if (result.data.contacts && result.data.contacts.length > 0) {
+        return result.data.contacts.map((c: any) => c.contact)
+      }
+      // Fallback to single contact for backward compatibility
+      return result.data.contact ? [result.data.contact] : null
     } else {
       set({ error: result.error })
       return null

@@ -10,6 +10,7 @@
     "search": "Buscar",
     "back": "Volver",
     "next": "Siguiente",
+    "previous": "Anterior",
     "confirm": "Confirmar",
     "yes": "Sí",
     "no": "No",
@@ -234,7 +235,15 @@
     "nameCopied": "Nombre copiado",
     "invalidEmail": "Por favor ingresa un email válido",
     "speechNotSupported": "El reconocimiento de voz no es compatible con este navegador.",
-    "scanFailed": "Error al escanear tarjeta. Inténtalo de nuevo."
+    "scanFailed": "Error al escanear tarjeta. Inténtalo de nuevo.",
+    "qrDetected": "Detectado",
+    "socialLinks": "Enlaces sociales",
+    "qrCodeScanned": "Código QR escaneado",
+    "scanningQR": "Escaneando código QR...",
+    "invitationSent": "Invitación enviada a {{name}}",
+    "contact": "contacto",
+    "cardOf": "Tarjeta {{current}} de {{total}}",
+    "multipleCardsDetected": "Múltiples tarjetas detectadas"
   },
   "voiceMemo": {
     "title": "Nota de voz",
@@ -404,5 +413,22 @@
     "featureCalendar": "Sincronización con Google Calendar",
     "featureCalendarDesc": "Sincroniza recordatorios y seguimientos como eventos del calendario",
     "signIn": "Iniciar Sesión"
+  },
+  "googleContacts": {
+    "title": "Contactos de Google",
+    "connect": "Conectar Contactos de Google",
+    "disconnect": "Desconectar",
+    "connectDescription": "Importa tus contactos de Google a Warmly. Los duplicados se detectan automáticamente.",
+    "import": "Importar",
+    "selectContactsToImport": "Seleccionar Contactos para Importar",
+    "importSelected": "Importar {{count}} Contacto(s)",
+    "duplicate": "Ya está en contactos",
+    "noContactsFound": "No se encontraron contactos en tu cuenta de Google.",
+    "hint": "Los contactos con email o teléfono coincidentes se detectarán como duplicados y se omitirán."
+  },
+  "export": {
+    "exportVcard": "Exportar Todos los Contactos (.vcf)",
+    "exportAll": "Exportar Todo",
+    "exporting": "Exportando..."
   }
 }

@@ -10,6 +10,7 @@
     "search": "ค้นหา",
     "back": "กลับ",
     "next": "ถัดไป",
+    "previous": "ก่อนหน้า",
     "confirm": "ยืนยัน",
     "yes": "ใช่",
     "no": "ไม่",
@@ -234,7 +235,15 @@
     "nameCopied": "คัดลอกชื่อแล้ว",
     "invalidEmail": "กรุณาใส่อีเมลที่ถูกต้อง",
     "speechNotSupported": "เบราว์เซอร์นี้ไม่รองรับการรู้จำเสียง",
-    "scanFailed": "สแกนนามบัตรไม่สำเร็จ กรุณาลองอีกครั้ง"
+    "scanFailed": "สแกนนามบัตรไม่สำเร็จ กรุณาลองอีกครั้ง",
+    "qrDetected": "ตรวจพบแล้ว",
+    "socialLinks": "ลิงก์โซเชียล",
+    "qrCodeScanned": "สแกน QR Code แล้ว",
+    "scanningQR": "กำลังสแกน QR Code...",
+    "invitationSent": "ส่งคำเชิญไปยัง {{name}} แล้ว",
+    "contact": "ผู้ติดต่อ",
+    "cardOf": "นามบัตร {{current}} จาก {{total}}",
+    "multipleCardsDetected": "ตรวจพบหลายนามบัตร"
   },
   "voiceMemo": {
     "title": "บันทึกเสียง",
@@ -404,5 +413,22 @@
     "featureCalendar": "ซิงค์ Google Calendar",
     "featureCalendarDesc": "ซิงค์การแจ้งเตือนและการติดตามเป็นกิจกรรมในปฏิทิน",
     "signIn": "เข้าสู่ระบบ"
+  },
+  "googleContacts": {
+    "title": "รายชื่อ Google",
+    "connect": "เชื่อมต่อรายชื่อ Google",
+    "disconnect": "ยกเลิกการเชื่อมต่อ",
+    "connectDescription": "นำเข้ารายชื่อ Google เข้าสู่ Warmly รายชื่อซ้ำจะถูกตรวจจับอัตโนมัติ",
+    "import": "นำเข้า",
+    "selectContactsToImport": "เลือกรายชื่อที่ต้องการนำเข้า",
+    "importSelected": "นำเข้า {{count}} รายชื่อ",
+    "duplicate": "มีอยู่แล้ว",
+    "noContactsFound": "ไม่พบรายชื่อในบัญชี Google ของคุณ",
+    "hint": "รายชื่อที่มีอีเมลหรือหมายเลขโทรศัพท์ตรงกันจะถูกตรวจจับว่าซ้ำและข้ามไป"
+  },
+  "export": {
+    "exportVcard": "ส่งออกรายชื่อทั้งหมด (.vcf)",
+    "exportAll": "ส่งออกทั้งหมด",
+    "exporting": "กำลังส่งออก..."
   }
 }

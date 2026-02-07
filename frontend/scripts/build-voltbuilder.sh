@@ -107,22 +107,36 @@ TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 # Create certificates directory and copy certificates
 mkdir -p certificates
 
-# iOS certificates
+# iOS certificates - check both project root and certificates/ subdirectory
 if [ -f "$PROJECT_DIR/ios_distribution.p12" ]; then
     cp "$PROJECT_DIR/ios_distribution.p12" certificates/
     echo "  Including iOS distribution certificate."
+elif [ -f "$PROJECT_DIR/certificates/ios_distribution.p12" ]; then
+    cp "$PROJECT_DIR/certificates/ios_distribution.p12" certificates/
+    echo "  Including iOS distribution certificate."
+else
+    echo "  Warning: ios_distribution.p12 not found"
 fi
+
 if [ -f "$PROJECT_DIR/MyWarmly_App_profile.mobileprovision" ]; then
     cp "$PROJECT_DIR/MyWarmly_App_profile.mobileprovision" certificates/
     echo "  Including iOS provisioning profile."
+elif [ -f "$PROJECT_DIR/certificates/MyWarmly_App_profile.mobileprovision" ]; then
+    cp "$PROJECT_DIR/certificates/MyWarmly_App_profile.mobileprovision" certificates/
+    echo "  Including iOS provisioning profile."
+else
+    echo "  Warning: MyWarmly_App_profile.mobileprovision not found"
 fi
 
-# Android keystore
+# Android keystore - check both project root and certificates/ subdirectory
 if [ -f "$PROJECT_DIR/android.p12" ]; then
     cp "$PROJECT_DIR/android.p12" certificates/
     echo "  Including Android keystore."
+elif [ -f "$PROJECT_DIR/certificates/android.p12" ]; then
+    cp "$PROJECT_DIR/certificates/android.p12" certificates/
+    echo "  Including Android keystore."
 else
-    echo "  Warning: android.p12 not found at $PROJECT_DIR/android.p12"
+    echo "  Warning: android.p12 not found"
 fi
 
 # --- iOS Package (Capacitor structure with ios/ directory) ---

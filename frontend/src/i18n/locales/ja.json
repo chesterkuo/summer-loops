@@ -10,6 +10,7 @@
     "search": "検索",
     "back": "戻る",
     "next": "次へ",
+    "previous": "前へ",
     "confirm": "確認",
     "yes": "はい",
     "no": "いいえ",
@@ -234,7 +235,15 @@
     "nameCopied": "名前をコピーしました",
     "invalidEmail": "有効なメールアドレスを入力してください",
     "speechNotSupported": "このブラウザは音声認識に対応していません。",
-    "scanFailed": "名刺のスキャンに失敗しました。もう一度お試しください。"
+    "scanFailed": "名刺のスキャンに失敗しました。もう一度お試しください。",
+    "qrDetected": "検出済み",
+    "socialLinks": "ソーシャルリンク",
+    "qrCodeScanned": "QRコードをスキャンしました",
+    "scanningQR": "QRコードをスキャン中...",
+    "invitationSent": "{{name}}に招待を送信しました",
+    "contact": "連絡先",
+    "cardOf": "{{current}} / {{total}} 枚目",
+    "multipleCardsDetected": "複数の名刺を検出"
   },
   "voiceMemo": {
     "title": "ボイスメモ",
@@ -404,5 +413,22 @@
     "featureCalendar": "Googleカレンダー同期",
     "featureCalendarDesc": "リマインダーとフォローアップをカレンダーイベントに同期",
     "signIn": "ログイン"
+  },
+  "googleContacts": {
+    "title": "Google コンタクト",
+    "connect": "Google コンタクトに接続",
+    "disconnect": "切断",
+    "connectDescription": "Google連絡先をWarmlyにインポートします。重複は自動的に検出されます。",
+    "import": "インポート",
+    "selectContactsToImport": "インポートする連絡先を選択",
+    "importSelected": "{{count}}件の連絡先をインポート",
+    "duplicate": "既に登録済み",
+    "noContactsFound": "Googleアカウントに連絡先が見つかりません。",
+    "hint": "メールアドレスまたは電話番号が一致する連絡先は重複として検出され、スキップされます。"
+  },
+  "export": {
+    "exportVcard": "全連絡先をエクスポート (.vcf)",
+    "exportAll": "すべてエクスポート",
+    "exporting": "エクスポート中..."
   }
 }

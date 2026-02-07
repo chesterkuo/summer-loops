@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS contacts (
   linkedin_url TEXT,
   notes TEXT,
   ai_summary TEXT,
-  source TEXT CHECK(source IN ('manual', 'card_scan', 'linkedin', 'natural_language', 'calendar')),
+  source TEXT CHECK(source IN ('manual', 'card_scan', 'linkedin', 'natural_language', 'calendar', 'google_contacts')),
   source_metadata TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -152,6 +152,17 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   completed_at DATETIME
 );
+
+-- Contact Invitations (track sent invites to prevent duplicates)
+CREATE TABLE IF NOT EXISTS contact_invitations (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  contact_id TEXT NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_invitations_email ON contact_invitations(email);
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);

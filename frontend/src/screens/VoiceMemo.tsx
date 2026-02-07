@@ -377,7 +377,7 @@ const VoiceMemo: React.FC<VoiceMemoProps> = ({ onNavigate }) => {
     setError(null);
 
     try {
-      const newContact = await createContact({
+      const result = await createContact({
         name: editedContact.name,
         company: editedContact.company || undefined,
         title: editedContact.title || undefined,
@@ -385,14 +385,14 @@ const VoiceMemo: React.FC<VoiceMemoProps> = ({ onNavigate }) => {
         source: 'natural_language'
       });
 
-      if (newContact) {
+      if (result) {
         await fetchContacts();
         setSaveSuccess(true);
         setShowSaveModal(false);
 
         // Navigate to contact profile
         setTimeout(() => {
-          setSelectedContact(newContact);
+          setSelectedContact(result.contact);
           onNavigate('profile');
         }, 1000);
       }

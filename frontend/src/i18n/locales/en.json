@@ -10,6 +10,7 @@
     "search": "Search",
     "back": "Back",
     "next": "Next",
+    "previous": "Previous",
     "confirm": "Confirm",
     "yes": "Yes",
     "no": "No",
@@ -124,7 +125,8 @@
     "notesPlaceholder": "What did you discuss?",
     "today": "Today",
     "yesterday": "Yesterday",
-    "daysAgo": "{{days}}d ago"
+    "daysAgo": "{{days}}d ago",
+    "noNotes": "No notes for this interaction"
   },
   "menu": {
     "quickJump": "Quick Jump",
@@ -292,7 +294,11 @@
     "qrDetected": "Detected",
     "socialLinks": "Social Links",
     "qrCodeScanned": "QR Code Scanned",
-    "scanningQR": "Scanning for QR code..."
+    "scanningQR": "Scanning for QR code...",
+    "invitationSent": "Invitation sent to {{name}}",
+    "contact": "contact",
+    "cardOf": "Card {{current}} of {{total}}",
+    "multipleCardsDetected": "Multiple cards detected"
   },
   "voiceMemo": {
     "title": "Voice Memo",
@@ -478,28 +484,32 @@
         "title": "3. Acceptable Use",
         "content": "You agree not to use Warmly for any unlawful purpose or in any way that could damage, disable, or impair the service. You must not attempt to gain unauthorized access to any part of the service. You agree not to upload any malicious content or spam. You must respect other users' privacy and intellectual property rights."
       },
+      "thirdParty": {
+        "title": "4. Third-Party Integrations",
+        "content": "Warmly offers optional integrations with third-party services including Google Calendar, Google Contacts, WhatsApp, and LINE. By connecting these services, you authorize Warmly to access specific data as described in our Privacy Policy. Google integrations are governed by Google's Terms of Service and the Google API Services User Data Policy. You may disconnect any third-party integration at any time from your Profile settings. Warmly is not responsible for the availability, accuracy, or policies of third-party services."
+      },
       "ip": {
-        "title": "4. Intellectual Property",
+        "title": "5. Intellectual Property",
         "content": "Warmly and its original content, features, and functionality are owned by Warmly and are protected by international copyright, trademark, and other intellectual property laws. You retain ownership of the data you upload to Warmly, but grant us a license to use this data to provide the service."
       },
       "termination": {
-        "title": "5. Termination",
+        "title": "6. Termination",
         "content": "We may terminate or suspend your account at any time, with or without cause, with or without notice. Upon termination, your right to use the service will immediately cease. You may also delete your account at any time through the app settings."
       },
       "disclaimer": {
-        "title": "6. Disclaimer",
+        "title": "7. Disclaimer",
         "content": "The service is provided \"as is\" and \"as available\" without any warranties of any kind. We do not guarantee that the service will be uninterrupted, timely, secure, or error-free. We are not responsible for any introductions or professional relationships that result from using the service."
       },
       "liability": {
-        "title": "7. Limitation of Liability",
+        "title": "8. Limitation of Liability",
         "content": "In no event shall Warmly, its directors, employees, or agents be liable for any indirect, incidental, special, consequential, or punitive damages arising out of or relating to your use of the service. Our total liability shall not exceed the amount you paid for the service in the past 12 months."
       },
       "changes": {
-        "title": "8. Changes to Terms",
+        "title": "9. Changes to Terms",
         "content": "We reserve the right to modify these terms at any time. We will notify users of any material changes via email or through the application. Your continued use of the service after such modifications constitutes your acceptance of the updated terms."
       },
       "contact": {
-        "title": "9. Contact Us",
+        "title": "10. Contact Us",
         "content": "If you have any questions about these Terms of Service, please contact us at support@mywarmly.app."
       }
     }
@@ -514,38 +524,54 @@
       },
       "collection": {
         "title": "2. Information We Collect",
-        "content": "We collect information you provide directly, including: your name, email address, and profile information; contact information you add to the app (names, companies, phone numbers, emails); relationship data and notes you create; interaction history you log. We also automatically collect device information, usage data, and analytics to improve our service."
+        "content": "We collect information you provide directly, including: your name, email address, and profile information; contact information you add to the app (names, companies, phone numbers, emails); relationship data and notes you create; interaction history you log. When you connect third-party services (such as Google Calendar or Google Contacts), we also collect data from those services as described in Section 3 below. We also automatically collect device information, usage data, and analytics to improve our service."
+      },
+      "googleData": {
+        "title": "3. Google API Services — User Data",
+        "content": "Warmly uses Google API Services to offer optional integrations. This section describes how we access, use, store, and share Google user data, in compliance with the Google API Services User Data Policy, including the Limited Use requirements."
+      },
+      "googleCalendar": {
+        "title": "3a. Google Calendar Integration",
+        "content": "When you connect Google Calendar, Warmly requests the \"calendar.events\" scope. We use this to: create, update, and delete calendar events in your primary Google Calendar that correspond to Warmly reminders and meeting follow-ups. We do NOT read, store, or access any of your existing calendar events. We only write events that you explicitly create within Warmly. OAuth tokens (access token and refresh token) are stored securely on our servers solely to maintain the connection. You can disconnect Google Calendar at any time from your Profile, which immediately revokes the token and deletes it from our servers."
+      },
+      "googleContacts": {
+        "title": "3b. Google Contacts Integration",
+        "content": "When you connect Google Contacts, Warmly requests the \"contacts.readonly\" scope. We use this to: display a list of your Google contacts so you can select which ones to import into Warmly. We only read contact names, email addresses, phone numbers, and organization details. We do NOT modify, delete, or write to your Google Contacts. Imported contact data (name, email, phone, company, title) is stored in your Warmly account. Contacts you do not select for import are not stored. OAuth tokens are stored securely on our servers solely to maintain the connection. You can disconnect Google Contacts at any time from your Profile, which immediately revokes the token and deletes it from our servers."
+      },
+      "googleLimitedUse": {
+        "title": "3c. Limited Use Disclosure",
+        "content": "Warmly's use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements. Specifically: (1) We only use Google data to provide and improve the user-facing features described above. (2) We do not transfer Google user data to third parties, except as necessary to provide the service, comply with applicable law, or as part of a merger/acquisition with adequate data protection. (3) We do not use Google user data for serving advertisements. (4) We do not allow humans to read Google user data, except with your affirmative consent for support purposes, for security/abuse investigation, to comply with law, or when the data is aggregated and anonymized for internal operations."
       },
       "usage": {
-        "title": "3. How We Use Your Information",
-        "content": "We use your information to: provide and maintain the Warmly service; personalize your experience and provide AI-powered features; send you important updates about the service; respond to your inquiries and provide customer support; analyze usage patterns to improve our service; comply with legal obligations."
+        "title": "4. How We Use Your Information",
+        "content": "We use your information to: provide and maintain the Warmly service; personalize your experience and provide AI-powered features; create calendar events from your reminders and follow-ups (when Google Calendar is connected); import contacts you select from Google Contacts; send you important updates about the service; respond to your inquiries and provide customer support; analyze usage patterns to improve our service; comply with legal obligations."
       },
       "storage": {
-        "title": "4. Data Storage and Security",
-        "content": "Your data is stored securely on our servers. We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction. However, no method of transmission over the Internet is 100% secure."
+        "title": "5. Data Storage and Security",
+        "content": "Your data is stored securely on our servers. OAuth tokens for third-party services (Google Calendar, Google Contacts) are encrypted and stored in isolated database tables accessible only by authenticated backend services. We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction. However, no method of transmission over the Internet is 100% secure."
       },
       "sharing": {
-        "title": "5. Data Sharing",
-        "content": "We do not sell your personal information to third parties. We may share your information with: service providers who assist in operating our application; legal authorities when required by law; other parties with your explicit consent. When you use the Teams feature, you control what contact information is shared with team members."
+        "title": "6. Data Sharing",
+        "content": "We do not sell your personal information to third parties. We do not share Google user data with third parties except as required by law. We may share other information with: service providers who assist in operating our application; legal authorities when required by law; other parties with your explicit consent. When you use the Teams feature, you control what contact information is shared with team members."
       },
       "rights": {
-        "title": "6. Your Rights",
-        "content": "You have the right to: access the personal data we hold about you; request correction of inaccurate data; request deletion of your data; export your data in a portable format; withdraw consent for data processing; opt out of marketing communications. To exercise these rights, please contact us at privacy@mywarmly.app."
+        "title": "7. Your Rights",
+        "content": "You have the right to: access the personal data we hold about you; request correction of inaccurate data; request deletion of your data; export your data in a portable format (including vCard export); withdraw consent for data processing; disconnect third-party integrations (Google Calendar, Google Contacts) at any time from your Profile; opt out of marketing communications. To exercise these rights, please contact us at privacy@mywarmly.app."
       },
       "security": {
-        "title": "7. Security Measures",
-        "content": "We implement industry-standard security measures including: encrypted data transmission (HTTPS/TLS); secure password storage using bcrypt hashing; regular security audits and updates; access controls and authentication. We encourage you to use a strong, unique password for your Warmly account."
+        "title": "8. Security Measures",
+        "content": "We implement industry-standard security measures including: encrypted data transmission (HTTPS/TLS); secure password storage using bcrypt hashing; encrypted storage of third-party OAuth tokens; regular security audits and updates; access controls and authentication. We encourage you to use a strong, unique password for your Warmly account."
       },
       "children": {
-        "title": "8. Children's Privacy",
+        "title": "9. Children's Privacy",
         "content": "Warmly is not intended for use by anyone under the age of 18. We do not knowingly collect personal information from children under 18. If we learn that we have collected personal information from a child under 18, we will take steps to delete that information."
       },
       "changes": {
-        "title": "9. Changes to This Policy",
+        "title": "10. Changes to This Policy",
         "content": "We may update this Privacy Policy from time to time. We will notify you of any material changes by posting the new policy in the app and updating the \"Last Updated\" date. We encourage you to review this policy periodically."
       },
       "contact": {
-        "title": "10. Contact Us",
+        "title": "11. Contact Us",
         "content": "If you have questions or concerns about this Privacy Policy or our data practices, please contact us at privacy@mywarmly.app."
       }
     }
@@ -667,5 +693,22 @@
     "featureCalendar": "Google Calendar Sync",
     "featureCalendarDesc": "Sync reminders and follow-ups as calendar events",
     "signIn": "Sign In"
+  },
+  "googleContacts": {
+    "title": "Google Contacts",
+    "connect": "Connect Google Contacts",
+    "disconnect": "Disconnect",
+    "connectDescription": "Import your Google contacts into Warmly. Duplicates are automatically detected.",
+    "import": "Import",
+    "selectContactsToImport": "Select Contacts to Import",
+    "importSelected": "Import {{count}} Contact(s)",
+    "duplicate": "Already in contacts",
+    "noContactsFound": "No contacts found in your Google account.",
+    "hint": "Contacts with matching email or phone will be detected as duplicates and skipped."
+  },
+  "export": {
+    "exportVcard": "Export All Contacts (.vcf)",
+    "exportAll": "Export All",
+    "exporting": "Exporting..."
   }
 }

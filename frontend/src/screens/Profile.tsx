@@ -7,7 +7,7 @@ import { useContactStore } from '../stores/contactStore';
 import { useLocaleStore } from '../stores/localeStore';
 import { useNotificationStore } from '../stores/notificationStore';
 import { useAuthStore } from '../stores/authStore';
-import { relationshipsApi, interactionsApi, aiApi, messagingApi, googleCalendarApi, Relationship, Interaction, Contact } from '../services/api';
+import { relationshipsApi, interactionsApi, aiApi, messagingApi, googleCalendarApi, googleContactsApi, exportApi, Relationship, Interaction, Contact } from '../services/api';
 
 interface ProfileProps {
   onNavigate: (screen: ScreenName) => void;
@@ -67,12 +67,24 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
   const [gcalStatus, setGcalStatus] = useState<{ connected: boolean; autoSync: boolean } | null>(null)
   const [isGcalDisconnecting, setIsGcalDisconnecting] = useState(false)
 
+  // Google Contacts state
+  const [gcontactsStatus, setGcontactsStatus] = useState<{ connected: boolean } | null>(null)
+  const [isGcontactsDisconnecting, setIsGcontactsDisconnecting] = useState(false)
+  const [showGcontactsImportModal, setShowGcontactsImportModal] = useState(false)
+  const [gcontacts, setGcontacts] = useState<Array<{ resourceName: string; name: string | null; email: string | null; phone: string | null; company: string | null; title: string | null; isDuplicate: boolean }>>([])
+  const [gcontactsSelectedIds, setGcontactsSelectedIds] = useState<Set<string>>(new Set())
+  const [isGcontactsImporting, setIsGcontactsImporting] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+
   // Edit contact state
   const [showEditContactModal, setShowEditContactModal] = useState(false);
   const [isSavingContact, setIsSavingContact] = useState(false);
   const [editingContact, setEditingContact] = useState<Partial<Contact>>({});
   const [isEditingInsight, setIsEditingInsight] = useState(false);
   const [editingInsight, setEditingInsight] = useState('');
+
+  // Interaction detail modal state
+  const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null);
 
   // Fetch relationship and interactions data for this contact
   useEffect(() => {
@@ -132,6 +144,9 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
       googleCalendarApi.getStatus().then(res => {
         if (res.data) setGcalStatus(res.data);
       });
+      googleContactsApi.getStatus().then(res => {
+        if (res.data) setGcontactsStatus(res.data);
+      });
     }
   }, [selectedContact]);
 
@@ -144,6 +159,14 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
     }
     if (params.get('gcal_error')) {
       console.error('Google Calendar connect error:', params.get('gcal_error'));
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    if (params.get('gcontacts_connected') === 'true') {
+      setGcontactsStatus({ connected: true });
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    if (params.get('gcontacts_error')) {
+      console.error('Google Contacts connect error:', params.get('gcontacts_error'));
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
@@ -305,6 +328,50 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
     const newVal = !gcalStatus.autoSync;
     const res = await googleCalendarApi.updateSettings({ autoSync: newVal });
     if (res.data) setGcalStatus({ ...gcalStatus, autoSync: res.data.autoSync });
+  };
+
+  // Google Contacts handlers
+  const handleGcontactsConnect = async () => {
+    const res = await googleContactsApi.getConnectUrl();
+    if (res.data?.url) {
+      window.location.href = res.data.url;
+    }
+  };
+
+  const handleGcontactsDisconnect = async () => {
+    setIsGcontactsDisconnecting(true);
+    await googleContactsApi.disconnect();
+    setGcontactsStatus({ connected: false });
+    setIsGcontactsDisconnecting(false);
+  };
+
+  const handleGcontactsImport = async () => {
+    const res = await googleContactsApi.listContacts();
+    if (res.data) {
+      setGcontacts(res.data);
+      setGcontactsSelectedIds(new Set());
+      setShowGcontactsImportModal(true);
+    }
+  };
+
+  const handleGcontactsImportSelected = async () => {
+    if (gcontactsSelectedIds.size === 0) return;
+    setIsGcontactsImporting(true);
+    const res = await googleContactsApi.importContacts(Array.from(gcontactsSelectedIds));
+    setIsGcontactsImporting(false);
+    if (res.data) {
+      setShowGcontactsImportModal(false);
+    }
+  };
+
+  const handleExportAllVcard = async () => {
+    setIsExporting(true);
+    try {
+      await exportApi.exportAllVcard();
+    } catch (err) {
+      console.error('Export failed:', err);
+    }
+    setIsExporting(false);
   };
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -596,6 +663,57 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Interaction Detail Modal */}
+      {selectedInteraction && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-[#2C3435] w-full max-w-sm rounded-2xl p-5 border border-white/10 shadow-2xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`flex size-10 shrink-0 items-center justify-center rounded-full border-[2px] shadow-sm
+                    ${selectedInteraction.type === 'meeting' || selectedInteraction.type === 'call'
+                      ? 'bg-background-dark border-primary shadow-primary/20'
+                      : 'bg-surface-card border-gray-600'}`}
+                >
+                  <span className="material-symbols-outlined text-[20px] text-gray-400">{getInteractionIcon(selectedInteraction.type)}</span>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white capitalize">{t(`interaction.${selectedInteraction.type}`)}</h3>
+                  <p className="text-xs text-gray-400">{new Date(selectedInteraction.occurred_at).toLocaleString()}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedInteraction(null)}
+                className="size-8 flex items-center justify-center rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {selectedInteraction.notes ? (
+                <div className="bg-black/20 rounded-xl p-4 border border-white/5">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">{t('interaction.notes')}</label>
+                  <p className="text-sm text-gray-300 whitespace-pre-wrap">{selectedInteraction.notes}</p>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <span className="material-symbols-outlined text-3xl mb-2 block">notes</span>
+                  <p className="text-sm">{t('interaction.noNotes')}</p>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setSelectedInteraction(null)}
+              className="w-full mt-4 py-3 rounded-xl bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold transition-colors"
+            >
+              {t('common.close')}
+            </button>
           </div>
         </div>
       )}
@@ -1156,6 +1274,95 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
         </div>
       )}
 
+      {/* Google Contacts Import Modal */}
+      {showGcontactsImportModal && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-[#2C3435] w-full max-w-md rounded-2xl p-6 border border-white/10 shadow-2xl max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <span className="material-symbols-outlined text-blue-400">contacts</span>
+                {t('googleContacts.selectContactsToImport', 'Select Contacts to Import')}
+              </h3>
+              <button onClick={() => setShowGcontactsImportModal(false)} className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-white/10">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            {gcontacts.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">
+                {t('googleContacts.noContactsFound', 'No contacts found in your Google account.')}
+              </p>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs text-gray-400">
+                    {gcontactsSelectedIds.size} {t('common.selected', 'selected')}
+                  </span>
+                  <button
+                    onClick={() => {
+                      const selectable = gcontacts.filter(c => !c.isDuplicate);
+                      if (gcontactsSelectedIds.size === selectable.length) {
+                        setGcontactsSelectedIds(new Set());
+                      } else {
+                        setGcontactsSelectedIds(new Set(selectable.map(c => c.resourceName)));
+                      }
+                    }}
+                    className="text-xs text-blue-400 font-bold"
+                  >
+                    {gcontactsSelectedIds.size === gcontacts.filter(c => !c.isDuplicate).length ? t('common.deselectAll', 'Deselect All') : t('common.selectAll', 'Select All')}
+                  </button>
+                </div>
+                <div className="overflow-y-auto flex-1 space-y-1 mb-4">
+                  {gcontacts.map(contact => (
+                    <label
+                      key={contact.resourceName}
+                      className={`flex items-center gap-3 p-2.5 rounded-xl ${contact.isDuplicate ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/5 cursor-pointer'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        disabled={contact.isDuplicate}
+                        checked={gcontactsSelectedIds.has(contact.resourceName)}
+                        onChange={() => {
+                          if (contact.isDuplicate) return;
+                          const next = new Set(gcontactsSelectedIds);
+                          if (next.has(contact.resourceName)) next.delete(contact.resourceName);
+                          else next.add(contact.resourceName);
+                          setGcontactsSelectedIds(next);
+                        }}
+                        className="accent-blue-400 size-4"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-white truncate">{contact.name || contact.email || contact.phone}</p>
+                          {contact.isDuplicate && (
+                            <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded font-bold shrink-0">
+                              {t('googleContacts.duplicate', 'Already in contacts')}
+                            </span>
+                          )}
+                        </div>
+                        {(contact.email || contact.company) && (
+                          <p className="text-xs text-gray-400 truncate">
+                            {[contact.company, contact.email].filter(Boolean).join(' — ')}
+                          </p>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                <button
+                  onClick={handleGcontactsImportSelected}
+                  disabled={isGcontactsImporting || gcontactsSelectedIds.size === 0}
+                  className="w-full py-3 rounded-xl bg-blue-500 hover:bg-blue-500/80 text-white font-bold text-sm transition-colors disabled:opacity-50"
+                >
+                  {isGcontactsImporting
+                    ? t('common.loading', 'Loading...')
+                    : t('googleContacts.importSelected', { count: gcontactsSelectedIds.size, defaultValue: `Import ${gcontactsSelectedIds.size} Contact(s)` })}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Quick Jump & Options Menu */}
       {showMenu && (
         <>
@@ -1559,10 +1766,77 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
               </p>
             </div>
 
+            {/* Google Contacts Import */}
+            <div className="bg-surface-card p-5 rounded-2xl shadow-sm border border-white/5">
+              <h3 className="font-bold text-xs text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-blue-400 text-[16px]">contacts</span>
+                {t('googleContacts.title', 'Google Contacts')}
+              </h3>
+
+              {!gcontactsStatus?.connected ? (
+                <div className="space-y-3">
+                  <p className="text-xs text-gray-400">
+                    {t('googleContacts.connectDescription', 'Import your Google contacts into Warmly. Duplicates are automatically detected.')}
+                  </p>
+                  <button
+                    onClick={handleGcontactsConnect}
+                    className="w-full py-2.5 rounded-xl bg-blue-500/20 text-blue-400 text-sm font-bold border border-blue-500/30 hover:bg-blue-500/30 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">link</span>
+                    {t('googleContacts.connect', 'Connect Google Contacts')}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5">
+                    <div className="flex items-center gap-3">
+                      <div className="size-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-blue-400 text-[20px]">contacts</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-white">{t('googleContacts.title', 'Google Contacts')}</p>
+                        <p className="text-xs text-green-400">{t('messaging.whatsapp.connected', 'Connected')}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleGcontactsImport}
+                        className="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 text-xs font-bold border border-blue-500/30 hover:bg-blue-500/30"
+                      >
+                        {t('googleContacts.import', 'Import')}
+                      </button>
+                      <button
+                        onClick={handleGcontactsDisconnect}
+                        disabled={isGcontactsDisconnecting}
+                        className="px-3 py-1.5 rounded-lg bg-red-900/20 text-red-400 text-xs font-bold border border-red-800/30 hover:bg-red-900/30 disabled:opacity-50"
+                      >
+                        {isGcontactsDisconnecting ? '...' : t('googleContacts.disconnect', 'Disconnect')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <p className="text-xs text-gray-500 mt-3 flex items-start gap-1.5">
+                <span className="material-symbols-outlined text-[14px] mt-0.5">info</span>
+                {t('googleContacts.hint', 'Contacts with matching email or phone will be detected as duplicates and skipped.')}
+              </p>
+            </div>
+
             {/* Account Actions */}
             <div className="bg-surface-card p-5 rounded-2xl shadow-sm border border-white/5">
               <h3 className="font-bold text-xs text-gray-400 uppercase tracking-widest mb-4">{t('profile.account')}</h3>
               <div className="space-y-2">
+                <button
+                  onClick={handleExportAllVcard}
+                  disabled={isExporting}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-left disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-purple-400">download</span>
+                  <span className="text-sm font-medium text-white">
+                    {isExporting ? t('export.exporting', 'Exporting...') : t('export.exportVcard', 'Export All Contacts (.vcf)')}
+                  </span>
+                </button>
                 <button
                   onClick={() => onNavigate('dashboard')}
                   className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-left"
@@ -1927,7 +2201,11 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
               </div>
             ) : (
               interactions.map((interaction) => (
-                <div key={interaction.id} className="relative flex gap-4 items-start group animate-fade-in">
+                <div
+                  key={interaction.id}
+                  onClick={() => setSelectedInteraction(interaction)}
+                  className="relative flex gap-4 items-start group animate-fade-in cursor-pointer hover:bg-white/5 -mx-2 px-2 py-2 rounded-lg transition-colors"
+                >
                   <div
                     className={`relative z-10 flex size-6 shrink-0 items-center justify-center rounded-full border-[2px] shadow-sm
                       ${interaction.type === 'meeting' || interaction.type === 'call'
@@ -1945,6 +2223,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
                       <p className="text-xs text-gray-400 line-clamp-2">{interaction.notes}</p>
                     )}
                   </div>
+                  <span className="material-symbols-outlined text-[16px] text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity self-center">chevron_right</span>
                 </div>
               ))
             )}

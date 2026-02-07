@@ -11,6 +11,7 @@ import type {
 } from '../types/index.js'
 import { scanBusinessCard, parseNaturalLanguage, isGeminiAvailable } from '../services/gemini.js'
 import { authMiddleware } from '../middleware/auth.js'
+import { sendContactInviteEmail } from '../utils/email.js'
 
 const contacts = new Hono()
 
@@ -151,7 +152,42 @@ contacts.post('/', async (c) => {
 
   const [contact] = await sql<Contact[]>`SELECT * FROM contacts WHERE id = ${id}`
 
-  return c.json({ data: contact }, 201)
+  // Send invitation email if contact has email and hasn't been invited before
+  let invitationSent = false
+  if (body.email) {
+    try {
+      // Check if this email has already received an invitation
+      const [existingInvitation] = await sql<{ id: string }[]>`
+        SELECT id FROM contact_invitations WHERE email = ${body.email}
+      `
+
+      if (!existingInvitation) {
+        // Get the user's name for the invitation
+        const [user] = await sql<{ name: string }[]>`
+          SELECT name FROM users WHERE id = ${userId}
+        `
+        const inviterName = user?.name || 'Someone'
+
+        // Send the invitation email with user's locale
+        const locale = (body as any).locale || 'en'
+        await sendContactInviteEmail(body.email, body.name, inviterName, locale)
+
+        // Record the invitation
+        const invitationId = generateId()
+        await sql`
+          INSERT INTO contact_invitations (id, user_id, contact_id, email, sent_at)
+          VALUES (${invitationId}, ${userId}, ${id}, ${body.email}, ${now})
+        `
+
+        invitationSent = true
+      }
+    } catch (error) {
+      // Log error but don't fail the contact creation
+      console.error('Failed to send invitation email:', error)
+    }
+  }
+
+  return c.json({ data: contact, invitationSent }, 201)
 })
 
 // Update contact
@@ -278,22 +314,37 @@ contacts.post('/scan', async (c) => {
   }
 
   try {
-    const scannedData = await scanBusinessCard(imageBase64, mimeType)
+    const scannedDataArray = await scanBusinessCard(imageBase64, mimeType)
+
+    // Map each scanned card to a contact object
+    const contacts = scannedDataArray.map(scannedData => ({
+      scanned: scannedData,
+      contact: {
+        name: scannedData.name,
+        company: scannedData.company,
+        title: scannedData.title,
+        email: scannedData.email,
+        phone: scannedData.phone?.join(', '),
+        linkedinUrl: scannedData.social?.linkedin,
+        twitterHandle: scannedData.social?.twitter,
+        lineId: scannedData.social?.line,
+        whatsappNumber: scannedData.social?.whatsapp,
+        telegramUsername: scannedData.social?.telegram,
+        wechatId: scannedData.social?.wechat,
+        facebookUrl: scannedData.social?.facebook,
+        instagramHandle: scannedData.social?.instagram,
+        source: 'card_scan',
+        sourceMetadata: JSON.stringify(scannedData)
+      }
+    }))
 
     return c.json({
       data: {
-        scanned: scannedData,
-        // Prepare for contact creation
-        contact: {
-          name: scannedData.name,
-          company: scannedData.company,
-          title: scannedData.title,
-          email: scannedData.email,
-          phone: scannedData.phone?.join(', '),
-          linkedinUrl: scannedData.social?.linkedin,
-          source: 'card_scan',
-          sourceMetadata: JSON.stringify(scannedData)
-        }
+        // Return array of contacts for multi-card support
+        contacts,
+        // Keep backward compatibility: also return first contact as single object
+        scanned: scannedDataArray[0],
+        contact: contacts[0]?.contact
       }
     })
   } catch (error) {
@@ -635,6 +686,79 @@ contacts.post('/import-linkedin', async (c) => {
     data: contact,
     message: 'Contact created from LinkedIn URL. Please update with additional details.'
   }, 201)
+})
+
+// ---- vCard Export ----
+
+function escapeVcardValue(val: string | null | undefined): string {
+  if (!val) return ''
+  return val.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n')
+}
+
+function contactToVcard(contact: any): string {
+  const name = contact.name || ''
+  const parts = name.split(/\s+/)
+  const firstName = parts[0] || ''
+  const lastName = parts.slice(1).join(' ') || ''
+
+  const lines = [
+    'BEGIN:VCARD',
+    'VERSION:3.0',
+    `FN:${escapeVcardValue(name)}`,
+    `N:${escapeVcardValue(lastName)};${escapeVcardValue(firstName)};;;`,
+  ]
+
+  if (contact.company) lines.push(`ORG:${escapeVcardValue(contact.company)}`)
+  if (contact.title) lines.push(`TITLE:${escapeVcardValue(contact.title)}`)
+  if (contact.email) lines.push(`EMAIL:${escapeVcardValue(contact.email)}`)
+  if (contact.phone) lines.push(`TEL:${escapeVcardValue(contact.phone)}`)
+  if (contact.linkedin_url) lines.push(`URL:${escapeVcardValue(contact.linkedin_url)}`)
+  if (contact.notes) lines.push(`NOTE:${escapeVcardValue(contact.notes)}`)
+
+  lines.push('END:VCARD')
+  return lines.join('\r\n')
+}
+
+// Export all contacts as vCard (.vcf)
+contacts.get('/export/vcard', async (c) => {
+  const userId = c.get('user').userId
+
+  const rows = await sql<Contact[]>`
+    SELECT * FROM contacts WHERE user_id = ${userId} ORDER BY name ASC
+  `
+
+  const vcf = rows.map(contactToVcard).join('\r\n')
+
+  return new Response(vcf, {
+    headers: {
+      'Content-Type': 'text/vcard; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="warmly-contacts.vcf"',
+    },
+  })
+})
+
+// Export single contact as vCard
+contacts.get('/:id/export/vcard', async (c) => {
+  const userId = c.get('user').userId
+  const { id } = c.req.param()
+
+  const [contact] = await sql<Contact[]>`
+    SELECT * FROM contacts WHERE id = ${id} AND user_id = ${userId}
+  `
+
+  if (!contact) {
+    return c.json({ error: 'Contact not found' }, 404)
+  }
+
+  const vcf = contactToVcard(contact)
+  const filename = `${(contact.name || 'contact').replace(/[^a-zA-Z0-9]/g, '-')}.vcf`
+
+  return new Response(vcf, {
+    headers: {
+      'Content-Type': 'text/vcard; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    },
+  })
 })
 
 export default contacts

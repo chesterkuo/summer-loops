@@ -10,6 +10,7 @@
     "search": "검색",
     "back": "뒤로",
     "next": "다음",
+    "previous": "이전",
     "confirm": "확인",
     "yes": "예",
     "no": "아니오",
@@ -234,7 +235,15 @@
     "nameCopied": "이름 복사됨",
     "invalidEmail": "유효한 이메일 주소를 입력하세요",
     "speechNotSupported": "이 브라우저는 음성 인식을 지원하지 않습니다.",
-    "scanFailed": "명함 스캔 실패. 다시 시도해 주세요."
+    "scanFailed": "명함 스캔 실패. 다시 시도해 주세요.",
+    "qrDetected": "감지됨",
+    "socialLinks": "소셜 링크",
+    "qrCodeScanned": "QR 코드 스캔됨",
+    "scanningQR": "QR 코드 스캔 중...",
+    "invitationSent": "{{name}}에게 초대를 보냈습니다",
+    "contact": "연락처",
+    "cardOf": "{{total}}장 중 {{current}}장",
+    "multipleCardsDetected": "여러 명함 감지됨"
   },
   "voiceMemo": {
     "title": "음성 메모",
@@ -404,5 +413,22 @@
     "featureCalendar": "Google 캘린더 동기화",
     "featureCalendarDesc": "리마인더와 팔로업을 캘린더 이벤트로 동기화",
     "signIn": "로그인"
+  },
+  "googleContacts": {
+    "title": "Google 연락처",
+    "connect": "Google 연락처 연결",
+    "disconnect": "연결 해제",
+    "connectDescription": "Google 연락처를 Warmly로 가져옵니다. 중복은 자동으로 감지됩니다.",
+    "import": "가져오기",
+    "selectContactsToImport": "가져올 연락처 선택",
+    "importSelected": "{{count}}개 연락처 가져오기",
+    "duplicate": "이미 등록됨",
+    "noContactsFound": "Google 계정에서 연락처를 찾을 수 없습니다.",
+    "hint": "이메일 또는 전화번호가 일치하는 연락처는 중복으로 감지되어 건너뜁니다."
+  },
+  "export": {
+    "exportVcard": "모든 연락처 내보내기 (.vcf)",
+    "exportAll": "전체 내보내기",
+    "exporting": "내보내는 중..."
   }
 }

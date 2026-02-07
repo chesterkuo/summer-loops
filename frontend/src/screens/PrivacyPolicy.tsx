@@ -53,7 +53,7 @@ const PrivacyPolicy: React.FC = () => {
         {/* Content */}
         <main className="px-6 py-8">
           <h1 className="text-2xl font-bold text-white mb-2">{t('privacy.title')}</h1>
-          <p className="text-text-muted text-sm mb-8">{t('privacy.lastUpdated')}: 2025-01-17</p>
+          <p className="text-text-muted text-sm mb-8">{t('privacy.lastUpdated')}: 2026-02-07</p>
 
           <div className="space-y-6 text-gray-300">
             {/* Introduction */}
@@ -66,6 +66,30 @@ const PrivacyPolicy: React.FC = () => {
             <section>
               <h2 className="text-lg font-semibold text-white mb-3">{t('privacy.sections.collection.title')}</h2>
               <p className="text-sm leading-relaxed">{t('privacy.sections.collection.content')}</p>
+            </section>
+
+            {/* Google API Services — User Data */}
+            <section>
+              <h2 className="text-lg font-semibold text-white mb-3">{t('privacy.sections.googleData.title')}</h2>
+              <p className="text-sm leading-relaxed">{t('privacy.sections.googleData.content')}</p>
+            </section>
+
+            {/* Google Calendar Integration */}
+            <section className="ml-4 border-l-2 border-blue-500/30 pl-4">
+              <h2 className="text-lg font-semibold text-white mb-3">{t('privacy.sections.googleCalendar.title')}</h2>
+              <p className="text-sm leading-relaxed">{t('privacy.sections.googleCalendar.content')}</p>
+            </section>
+
+            {/* Google Contacts Integration */}
+            <section className="ml-4 border-l-2 border-blue-500/30 pl-4">
+              <h2 className="text-lg font-semibold text-white mb-3">{t('privacy.sections.googleContacts.title')}</h2>
+              <p className="text-sm leading-relaxed">{t('privacy.sections.googleContacts.content')}</p>
+            </section>
+
+            {/* Limited Use Disclosure */}
+            <section className="ml-4 border-l-2 border-blue-500/30 pl-4">
+              <h2 className="text-lg font-semibold text-white mb-3">{t('privacy.sections.googleLimitedUse.title')}</h2>
+              <p className="text-sm leading-relaxed">{t('privacy.sections.googleLimitedUse.content')}</p>
             </section>
 
             {/* How We Use Information */}

@@ -10,6 +10,7 @@
     "search": "Tìm kiếm",
     "back": "Quay lại",
     "next": "Tiếp theo",
+    "previous": "Trước đó",
     "confirm": "Xác nhận",
     "yes": "Có",
     "no": "Không",
@@ -234,7 +235,15 @@
     "nameCopied": "Đã sao chép tên",
     "invalidEmail": "Vui lòng nhập email hợp lệ",
     "speechNotSupported": "Trình duyệt này không hỗ trợ nhận dạng giọng nói.",
-    "scanFailed": "Quét danh thiếp thất bại. Vui lòng thử lại."
+    "scanFailed": "Quét danh thiếp thất bại. Vui lòng thử lại.",
+    "qrDetected": "Đã phát hiện",
+    "socialLinks": "Liên kết mạng xã hội",
+    "qrCodeScanned": "Đã quét mã QR",
+    "scanningQR": "Đang quét mã QR...",
+    "invitationSent": "Đã gửi lời mời đến {{name}}",
+    "contact": "liên hệ",
+    "cardOf": "Danh thiếp {{current}}/{{total}}",
+    "multipleCardsDetected": "Phát hiện nhiều danh thiếp"
   },
   "voiceMemo": {
     "title": "Ghi âm giọng nói",
@@ -404,5 +413,22 @@
     "featureCalendar": "Đồng Bộ Google Calendar",
     "featureCalendarDesc": "Đồng bộ nhắc nhở và theo dõi thành sự kiện lịch",
     "signIn": "Đăng Nhập"
+  },
+  "googleContacts": {
+    "title": "Danh Bạ Google",
+    "connect": "Kết Nối Danh Bạ Google",
+    "disconnect": "Ngắt Kết Nối",
+    "connectDescription": "Nhập danh bạ Google vào Warmly. Các liên hệ trùng lặp sẽ được phát hiện tự động.",
+    "import": "Nhập",
+    "selectContactsToImport": "Chọn Liên Hệ để Nhập",
+    "importSelected": "Nhập {{count}} Liên Hệ",
+    "duplicate": "Đã có trong danh bạ",
+    "noContactsFound": "Không tìm thấy liên hệ trong tài khoản Google của bạn.",
+    "hint": "Liên hệ có email hoặc số điện thoại trùng khớp sẽ được phát hiện là trùng lặp và bỏ qua."
+  },
+  "export": {
+    "exportVcard": "Xuất Tất Cả Liên Hệ (.vcf)",
+    "exportAll": "Xuất Tất Cả",
+    "exporting": "Đang xuất..."
   }
 }

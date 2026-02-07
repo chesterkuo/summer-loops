@@ -52,6 +52,12 @@ export interface ScannedContactData {
   social?: {
     linkedin?: string
     twitter?: string
+    line?: string
+    whatsapp?: string
+    telegram?: string
+    wechat?: string
+    facebook?: string
+    instagram?: string
     other?: string
   }
 }
@@ -73,36 +79,51 @@ export interface ParsedContactData {
 
 /**
  * OCR scan a business card image and extract contact information
+ * Supports multiple business cards in a single image
  */
-export async function scanBusinessCard(imageBase64: string, mimeType: string = 'image/jpeg'): Promise<ScannedContactData> {
+export async function scanBusinessCard(imageBase64: string, mimeType: string = 'image/jpeg'): Promise<ScannedContactData[]> {
   if (!model) {
     throw new Error('Gemini AI not initialized')
   }
 
-  const prompt = `Analyze this business card image and extract all contact information.
-Return the data as valid JSON with this exact structure:
-{
-  "name": "Full name as shown",
-  "nameRomanized": "Romanized name if the original is in CJK characters, otherwise omit",
-  "company": "Company or organization name",
-  "title": "Job title or position",
-  "email": "Email address",
-  "phone": ["Array of phone numbers"],
-  "address": "Full address if present",
-  "website": "Website URL if present",
-  "social": {
-    "linkedin": "LinkedIn URL if present",
-    "twitter": "Twitter handle if present",
-    "other": "Other social media"
+  const prompt = `Analyze this image and extract contact information from ALL business cards visible.
+
+IMPORTANT: There may be ONE or MULTIPLE business cards in this image. Carefully detect each separate card and extract information for each person.
+
+Return the data as a JSON ARRAY with this structure:
+[
+  {
+    "name": "Full name as shown",
+    "nameRomanized": "Romanized name if the original is in CJK characters, otherwise omit",
+    "company": "Company or organization name",
+    "title": "Job title or position",
+    "email": "Email address",
+    "phone": ["Array of phone numbers"],
+    "address": "Full address if present",
+    "website": "Website URL if present",
+    "social": {
+      "linkedin": "LinkedIn URL or username if present",
+      "twitter": "Twitter/X handle if present",
+      "line": "LINE ID if present (common on Asian business cards)",
+      "whatsapp": "WhatsApp number if present",
+      "telegram": "Telegram username if present",
+      "wechat": "WeChat ID if present (common on Chinese business cards)",
+      "facebook": "Facebook URL or username if present",
+      "instagram": "Instagram handle if present",
+      "other": "Any other social media not listed above"
+    }
   }
-}
+]
 
 Rules:
-- Return ONLY valid JSON, no markdown formatting, no code blocks
-- Omit any fields that are not present on the card
+- Return ONLY valid JSON array, no markdown formatting, no code blocks
+- If there's only ONE card, still return an array with one object
+- If there are MULTIPLE cards, return an array with multiple objects (one per card)
+- Omit any fields that are not present on each card
 - For phone numbers, include country code if visible
 - Clean up formatting (remove extra spaces, standardize phone formats)
-- If name is in Chinese/Japanese/Korean, also provide romanized version`
+- If name is in Chinese/Japanese/Korean, also provide romanized version
+- Each card should be a separate object in the array, even if they share the same company`
 
   const result = await model.generateContent([
     prompt,
@@ -123,7 +144,13 @@ Rules:
   }
 
   try {
-    return JSON.parse(jsonText) as ScannedContactData
+    const parsed = JSON.parse(jsonText)
+    // Handle both array and single object responses for backward compatibility
+    if (Array.isArray(parsed)) {
+      return parsed as ScannedContactData[]
+    } else {
+      return [parsed] as ScannedContactData[]
+    }
   } catch (e) {
     console.error('Failed to parse Gemini response:', responseText)
     throw new Error('Failed to parse business card data')

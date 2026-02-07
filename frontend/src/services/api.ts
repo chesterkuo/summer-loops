@@ -229,8 +229,16 @@ export const authApi = {
 }
 
 // Contacts API
+export interface ContactsListResponse {
+  data: Contact[]
+  total: number
+  limit: number
+  offset: number
+  hasMore: boolean
+}
+
 export const contactsApi = {
-  async list(params?: { search?: string; company?: string; limit?: number; offset?: number }) {
+  async list(params?: { search?: string; company?: string; limit?: number; offset?: number }): Promise<{ data?: Contact[]; total?: number; error?: string }> {
     const query = new URLSearchParams()
     if (params?.search) query.set('search', params.search)
     if (params?.company) query.set('company', params.company)
@@ -238,18 +246,55 @@ export const contactsApi = {
     if (params?.offset) query.set('offset', String(params.offset))
 
     const queryStr = query.toString()
-    return apiFetch<Contact[]>(`/contacts${queryStr ? `?${queryStr}` : ''}`)
+
+    // Custom fetch to preserve total count
+    const headers: HeadersInit = { 'Content-Type': 'application/json' }
+    const token = getAuthToken()
+    if (token) {
+      (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/contacts${queryStr ? `?${queryStr}` : ''}`, { headers })
+      const json = await response.json()
+
+      if (!response.ok) {
+        return { error: json.error || `HTTP ${response.status}` }
+      }
+
+      return { data: json.data, total: json.total }
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : 'Network error' }
+    }
   },
 
   async get(id: string) {
     return apiFetch<Contact>(`/contacts/${id}`)
   },
 
-  async create(data: Partial<Contact>) {
-    return apiFetch<Contact>('/contacts', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
+  async create(data: Partial<Contact> & { locale?: string }): Promise<{ data?: Contact; invitationSent?: boolean; error?: string }> {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    }
+    const token = getAuthToken()
+    if (token) {
+      (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/contacts`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data),
+      })
+      const json = await response.json()
+      if (!response.ok) {
+        return { error: json.error || `HTTP ${response.status}` }
+      }
+      return { data: json.data, invitationSent: json.invitationSent }
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : 'Network error' }
+    }
   },
 
   async update(id: string, data: Partial<Contact>) {
@@ -264,7 +309,11 @@ export const contactsApi = {
   },
 
   async scan(imageBase64: string, mimeType?: string) {
-    return apiFetch<{ scanned: any; contact: Partial<Contact> }>('/contacts/scan', {
+    return apiFetch<{
+      scanned: any;
+      contact: Partial<Contact>;
+      contacts?: Array<{ scanned: any; contact: Partial<Contact> }>;
+    }>('/contacts/scan', {
       method: 'POST',
       body: JSON.stringify({ image: imageBase64, mimeType }),
     })
@@ -883,5 +932,62 @@ export const googleCalendarApi = {
     return apiFetch(`/google-calendar/sync/notification/${notificationId}`, {
       method: 'DELETE',
     })
+  },
+}
+
+// Google Contacts API
+export const googleContactsApi = {
+  async getConnectUrl() {
+    return apiFetch<{ url: string }>('/google-contacts/connect-url')
+  },
+
+  async getStatus() {
+    return apiFetch<{ connected: boolean; connectedAt: string | null }>('/google-contacts/status')
+  },
+
+  async listContacts() {
+    return apiFetch<Array<{ resourceName: string; name: string | null; email: string | null; phone: string | null; company: string | null; title: string | null; isDuplicate: boolean }>>('/google-contacts/contacts')
+  },
+
+  async importContacts(resourceNames: string[]) {
+    return apiFetch<{ imported: Array<{ id: string; name: string }>; count: number }>('/google-contacts/import', {
+      method: 'POST',
+      body: JSON.stringify({ resourceNames }),
+    })
+  },
+
+  async disconnect() {
+    return apiFetch('/google-contacts/disconnect', { method: 'POST' })
+  },
+}
+
+// Export API (vCard download)
+export const exportApi = {
+  async exportAllVcard() {
+    const headers: Record<string, string> = {}
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`
+    const response = await fetch(`${API_BASE}/contacts/export/vcard`, { headers })
+    if (!response.ok) throw new Error('Export failed')
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'warmly-contacts.vcf'
+    a.click()
+    URL.revokeObjectURL(url)
+  },
+
+  async exportContactVcard(id: string) {
+    const headers: Record<string, string> = {}
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`
+    const response = await fetch(`${API_BASE}/contacts/${id}/export/vcard`, { headers })
+    if (!response.ok) throw new Error('Export failed')
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `contact-${id}.vcf`
+    a.click()
+    URL.revokeObjectURL(url)
   },
 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScreenName } from '../App';
 import { useContactStore } from '../stores/contactStore';
+import { useLocaleStore } from '../stores/localeStore';
 import { contactsApi, Contact } from '../services/api';
 import {
   decodeQRFromImage,
@@ -21,12 +22,14 @@ const STORAGE_KEY = 'warmly_contact_draft';
 const ScanCard: React.FC<ScanCardProps> = ({ onNavigate }) => {
   const { t } = useTranslation();
   const { createContact, setSelectedContact, scanCard } = useContactStore();
+  const { currentLocale } = useLocaleStore();
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [isScanned, setIsScanned] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const emailInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   // Batch Mode State
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -36,6 +39,9 @@ const ScanCard: React.FC<ScanCardProps> = ({ onNavigate }) => {
 
   // Copy Feedback State
   const [copied, setCopied] = useState(false);
+
+  // Invitation Toast State
+  const [invitationToast, setInvitationToast] = useState<string | null>(null);
 
   // Validation State
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -48,6 +54,10 @@ const ScanCard: React.FC<ScanCardProps> = ({ onNavigate }) => {
 
   // QR Code State
   const [qrDetected, setQrDetected] = useState<QRContactData | null>(null);
+
+  // Multi-card scanning state
+  const [scannedContacts, setScannedContacts] = useState<typeof contactData[]>([]);
+  const [currentCardIndex, setCurrentCardIndex] = useState(0);
 
   // Live Camera State
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -288,10 +298,11 @@ const ScanCard: React.FC<ScanCardProps> = ({ onNavigate }) => {
       }
 
       // No QR code found - fall back to OCR scan
-      const result = await scanCard(base64Data);
+      const results = await scanCard(base64Data);
 
-      if (result) {
-        setContactData({
+      if (results && results.length > 0) {
+        // Map results to contact data format
+        const contacts = results.map(result => ({
           name: result.name || '',
           title: result.title || '',
           company: result.company || '',
@@ -299,8 +310,13 @@ const ScanCard: React.FC<ScanCardProps> = ({ onNavigate }) => {
           phone: result.phone || '',
           email: result.email || '',
           notes: '',
-          social: {}
-        });
+          social: {} as { line?: string; telegram?: string; whatsapp?: string; wechat?: string }
+        }));
+
+        // Store all scanned contacts
+        setScannedContacts(contacts);
+        setCurrentCardIndex(0);
+        setContactData(contacts[0]);
         setIsScanned(true);
         stopCamera(); // Stop camera after successful scan
       } else {
@@ -376,10 +392,11 @@ const ScanCard: React.FC<ScanCardProps> = ({ onNavigate }) => {
       }
 
       // No QR code found - fall back to OCR scan
-      const result = await scanCard(base64Data);
+      const results = await scanCard(base64Data);
 
-      if (result) {
-        setContactData({
+      if (results && results.length > 0) {
+        // Map results to contact data format
+        const contacts = results.map(result => ({
           name: result.name || '',
           title: result.title || '',
           company: result.company || '',
@@ -387,8 +404,13 @@ const ScanCard: React.FC<ScanCardProps> = ({ onNavigate }) => {
           phone: result.phone || '',
           email: result.email || '',
           notes: '',
-          social: {}
-        });
+          social: {} as { line?: string; telegram?: string; whatsapp?: string; wechat?: string }
+        }));
+
+        // Store all scanned contacts
+        setScannedContacts(contacts);
+        setCurrentCardIndex(0);
+        setContactData(contacts[0]);
         setIsScanned(true);
       } else {
         setScanError(t('scanCard.scanFailed'));
@@ -397,6 +419,7 @@ const ScanCard: React.FC<ScanCardProps> = ({ onNavigate }) => {
 
       // Reset file input
       if (fileInputRef.current) fileInputRef.current.value = '';
+      if (galleryInputRef.current) galleryInputRef.current.value = '';
     };
     reader.readAsDataURL(file);
   };
@@ -407,6 +430,8 @@ const ScanCard: React.FC<ScanCardProps> = ({ onNavigate }) => {
     setScanError(null);
     setPreviewImage(null);
     setQrDetected(null);
+    setScannedContacts([]);
+    setCurrentCardIndex(0);
     localStorage.removeItem(STORAGE_KEY); // Clear draft
     // Reset contact data
     setContactData({
@@ -438,7 +463,7 @@ const ScanCard: React.FC<ScanCardProps> = ({ onNavigate }) => {
         }
       }
 
-      const newContact = await createContact({
+      const result = await createContact({
         name: contactData.name,
         title: contactData.title,
         company: contactData.company,
@@ -447,13 +472,34 @@ const ScanCard: React.FC<ScanCardProps> = ({ onNavigate }) => {
         email: contactData.email,
         notes: notes,
         source: qrDetected ? 'card_scan' : 'card_scan',
+        locale: currentLocale,
       });
 
-      if (newContact) {
-        localStorage.removeItem(STORAGE_KEY); // Clear draft on save
-        setQrDetected(null);
-        setSelectedContact(newContact);
-        onNavigate('profile');
+      if (result) {
+        // Show invitation toast if email was sent
+        if (result.invitationSent) {
+          setInvitationToast(contactData.name || contactData.email || t('scanCard.contact'));
+          setTimeout(() => setInvitationToast(null), 4000);
+        }
+
+        // Handle multi-card: remove saved card and move to next
+        if (scannedContacts.length > 1) {
+          const remainingContacts = scannedContacts.filter((_, idx) => idx !== currentCardIndex);
+          setScannedContacts(remainingContacts);
+
+          // Move to next card (or previous if we were on the last one)
+          const newIndex = currentCardIndex >= remainingContacts.length
+            ? remainingContacts.length - 1
+            : currentCardIndex;
+          setCurrentCardIndex(newIndex);
+          setContactData(remainingContacts[newIndex]);
+        } else {
+          // Last or only card - navigate to profile
+          localStorage.removeItem(STORAGE_KEY); // Clear draft on save
+          setQrDetected(null);
+          setSelectedContact(result.contact);
+          onNavigate('profile');
+        }
       }
     }
   };
@@ -566,12 +612,21 @@ END:VCARD`;
         </div>
       )}
 
-      {/* Hidden file input for image capture */}
+      {/* Hidden file input for camera capture */}
       <input
         ref={fileInputRef}
         type="file"
         accept="image/*"
         capture="environment"
+        className="hidden"
+        onChange={handleFileSelect}
+      />
+
+      {/* Hidden file input for photo library (no capture attribute) */}
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
         className="hidden"
         onChange={handleFileSelect}
       />
@@ -737,6 +792,52 @@ END:VCARD`;
                  {t('common.retake')}
                </button>
             </div>
+
+            {/* Multi-card navigation */}
+            {scannedContacts.length > 1 && (
+              <div className="flex items-center justify-between bg-primary/10 border border-primary/20 rounded-xl px-4 py-3 animate-fade-in">
+                <button
+                  onClick={() => {
+                    // Save current edits before switching
+                    const updatedContacts = [...scannedContacts];
+                    updatedContacts[currentCardIndex] = contactData;
+                    setScannedContacts(updatedContacts);
+
+                    const newIndex = Math.max(0, currentCardIndex - 1);
+                    setCurrentCardIndex(newIndex);
+                    setContactData(updatedContacts[newIndex]);
+                  }}
+                  disabled={currentCardIndex === 0}
+                  className={`flex items-center gap-1 text-sm font-bold transition-colors ${currentCardIndex === 0 ? 'text-gray-600' : 'text-primary hover:text-white'}`}
+                >
+                  <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+                  {t('common.previous')}
+                </button>
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary text-[20px]">credit_card</span>
+                  <span className="text-white font-bold text-sm">
+                    {t('scanCard.cardOf', { current: currentCardIndex + 1, total: scannedContacts.length })}
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    // Save current edits before switching
+                    const updatedContacts = [...scannedContacts];
+                    updatedContacts[currentCardIndex] = contactData;
+                    setScannedContacts(updatedContacts);
+
+                    const newIndex = Math.min(scannedContacts.length - 1, currentCardIndex + 1);
+                    setCurrentCardIndex(newIndex);
+                    setContactData(updatedContacts[newIndex]);
+                  }}
+                  disabled={currentCardIndex === scannedContacts.length - 1}
+                  className={`flex items-center gap-1 text-sm font-bold transition-colors ${currentCardIndex === scannedContacts.length - 1 ? 'text-gray-600' : 'text-primary hover:text-white'}`}
+                >
+                  {t('common.next')}
+                  <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+                </button>
+              </div>
+            )}
             
             <div className="space-y-3">
               <div>
@@ -904,24 +1005,8 @@ END:VCARD`;
               </div>
             </div>
 
-            {/* Gallery Strip */}
-            <div className="mb-auto">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t('scanCard.recentScans')}</p>
-                <button className="text-primary text-xs font-bold hover:underline">{t('scanCard.viewAll')}</button>
-              </div>
-              <div className="flex overflow-x-auto gap-3 pb-2 no-scrollbar -mx-6 px-6">
-                <div className="relative shrink-0 w-24 aspect-[3/4] rounded-lg overflow-hidden border border-gray-700 shadow-sm">
-                  <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuBkIoIcLJN3A7h30hMCkMnzB-WFzOg0EAATEDtj-SeBGgz7rkkaox8Ix7MQIe2Trlni58nBS7cactMQSHf-WQzHkpoNhkJD8CfnUdv4HZDDTxxyJb2CjOZIlbDRL2cPBXtkdS7_QUutsvmWItp4Rnz6LuY6c0RYtdArKgsUTayNuYzeJHj_ATzReByuhzUamXgRHmcemNjfKQm36G_X4HIPKCblowrUYsR8yPk2k63mvHOKVaVZBpHkjCZu_icotBsAoZ1imNcEK9A0")' }}></div>
-                  <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 to-transparent flex items-end p-2">
-                    <span className="material-symbols-outlined text-white text-sm">check_circle</span>
-                  </div>
-                </div>
-                <div className="relative shrink-0 w-24 aspect-[3/4] rounded-lg overflow-hidden border border-gray-700 shadow-sm opacity-70">
-                  <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuBwWrT_a6sfjIhRkQU9N6FMIUd00i_S6fqEYWtstndo0CJ-VYC_Ti4MJYZ3iYKAUSd1yvgbtxfJmFNGvHOYERwInm9yrKTQ7jXaefa7XgRraMhHHGsUou-TWu7j_WJc1atteDKn44uNyucVaofegV2aM-vJUwRpfRweEft5tQHUeuRVypkBjFs0wS61UQlVzbnANTokMgT57PeuOSveU49UT6AmQDzhGACbxGD8AOPFUXu8ikksVykxek49KGpXaM1a9mIekzVz56qQ")' }}></div>
-                </div>
-              </div>
-            </div>
+            {/* Spacer to push shutter to bottom */}
+            <div className="mb-auto"></div>
 
             {/* Shutter */}
             <div className="flex items-center justify-center mt-6">
@@ -938,7 +1023,10 @@ END:VCARD`;
                      <span className="text-[10px] font-bold uppercase tracking-wide">{t('common.finish')}</span>
                   </button>
                 ) : (
-                  <button className="flex flex-col items-center gap-1 text-gray-500 hover:text-primary transition-colors">
+                  <button
+                    onClick={() => galleryInputRef.current?.click()}
+                    className="flex flex-col items-center gap-1 text-gray-500 hover:text-primary transition-colors"
+                  >
                     <span className="material-symbols-outlined" style={{ fontSize: '28px' }}>photo_library</span>
                   </button>
                 )}
@@ -975,6 +1063,16 @@ END:VCARD`;
           </>
         )}
       </div>
+
+      {/* Invitation Sent Toast */}
+      {invitationToast && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
+          <div className="bg-primary text-black px-5 py-3 rounded-xl shadow-lg shadow-primary/30 flex items-center gap-3">
+            <span className="material-symbols-outlined text-[20px]">mail</span>
+            <span className="font-medium text-sm">{t('scanCard.invitationSent', { name: invitationToast })}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

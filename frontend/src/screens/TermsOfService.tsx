@@ -53,7 +53,7 @@ const TermsOfService: React.FC = () => {
         {/* Content */}
         <main className="px-6 py-8">
           <h1 className="text-2xl font-bold text-white mb-2">{t('tos.title')}</h1>
-          <p className="text-text-muted text-sm mb-8">{t('tos.lastUpdated')}: 2025-01-17</p>
+          <p className="text-text-muted text-sm mb-8">{t('tos.lastUpdated')}: 2026-02-07</p>
 
           <div className="space-y-6 text-gray-300">
             {/* Introduction */}
@@ -72,6 +72,12 @@ const TermsOfService: React.FC = () => {
             <section>
               <h2 className="text-lg font-semibold text-white mb-3">{t('tos.sections.acceptableUse.title')}</h2>
               <p className="text-sm leading-relaxed">{t('tos.sections.acceptableUse.content')}</p>
+            </section>
+
+            {/* Third-Party Integrations */}
+            <section>
+              <h2 className="text-lg font-semibold text-white mb-3">{t('tos.sections.thirdParty.title')}</h2>
+              <p className="text-sm leading-relaxed">{t('tos.sections.thirdParty.content')}</p>
             </section>
 
             {/* Intellectual Property */}
