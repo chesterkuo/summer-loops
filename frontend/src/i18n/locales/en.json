@@ -706,6 +706,17 @@
     "noContactsFound": "No contacts found in your Google account.",
     "hint": "Contacts with matching email or phone will be detected as duplicates and skipped."
   },
+  "googleCalendar": {
+    "title": "Google Calendar",
+    "connect": "Connect Google Calendar",
+    "disconnect": "Disconnect",
+    "connected": "Connected",
+    "connectDescription": "Connect Google Calendar to automatically sync reminders and meeting follow-ups as calendar events.",
+    "autoSync": "Auto-sync reminders",
+    "autoSyncDescription": "New reminders & follow-ups sync automatically",
+    "hintConnected": "Individual reminders can also be added/removed from calendar in the notification panel.",
+    "hintDisconnected": "Reminders and meeting follow-up action items will appear as events in your primary Google Calendar."
+  },
   "export": {
     "exportVcard": "Export All Contacts (.vcf)",
     "exportAll": "Export All",

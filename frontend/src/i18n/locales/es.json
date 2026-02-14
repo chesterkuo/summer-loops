@@ -426,6 +426,17 @@
     "noContactsFound": "No se encontraron contactos en tu cuenta de Google.",
     "hint": "Los contactos con email o teléfono coincidentes se detectarán como duplicados y se omitirán."
   },
+  "googleCalendar": {
+    "title": "Google Calendar",
+    "connect": "Conectar Google Calendar",
+    "disconnect": "Desconectar",
+    "connected": "Conectado",
+    "connectDescription": "Conecta Google Calendar para sincronizar automáticamente recordatorios y seguimientos de reuniones como eventos del calendario.",
+    "autoSync": "Sincronización automática de recordatorios",
+    "autoSyncDescription": "Los nuevos recordatorios y seguimientos se sincronizan automáticamente",
+    "hintConnected": "Los recordatorios individuales también se pueden agregar o quitar del calendario en el panel de notificaciones.",
+    "hintDisconnected": "Los recordatorios y las acciones de seguimiento de reuniones aparecerán como eventos en tu Google Calendar principal."
+  },
   "export": {
     "exportVcard": "Exportar Todos los Contactos (.vcf)",
     "exportAll": "Exportar Todo",

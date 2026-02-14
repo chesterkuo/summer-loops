@@ -426,6 +426,17 @@
     "noContactsFound": "Googleアカウントに連絡先が見つかりません。",
     "hint": "メールアドレスまたは電話番号が一致する連絡先は重複として検出され、スキップされます。"
   },
+  "googleCalendar": {
+    "title": "Google Calendar",
+    "connect": "Google Calendar に接続",
+    "disconnect": "切断",
+    "connected": "接続済み",
+    "connectDescription": "Google Calendar に接続して、リマインダーやミーティングのフォローアップをカレンダーイベントとして自動同期します。",
+    "autoSync": "リマインダーを自動同期",
+    "autoSyncDescription": "新しいリマインダーとフォローアップは自動的に同期されます",
+    "hintConnected": "個別のリマインダーは通知パネルからもカレンダーへの追加・削除ができます。",
+    "hintDisconnected": "リマインダーやミーティングのフォローアップ項目は、メインの Google Calendar にイベントとして表示されます。"
+  },
   "export": {
     "exportVcard": "全連絡先をエクスポート (.vcf)",
     "exportAll": "すべてエクスポート",

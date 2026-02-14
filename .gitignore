@@ -61,3 +61,8 @@ coverage/
 
 # VoltBuilder packages
 *-voltbuilder-*.zip
+warmly-ios-*.zip
+warmly-android-*.zip
+
+# Certificates
+certificates/*.p12

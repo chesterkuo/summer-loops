@@ -903,8 +903,9 @@ export const teamsApi = {
 
 // Google Calendar API
 export const googleCalendarApi = {
-  async getConnectUrl() {
-    return apiFetch<{ url: string }>('/google-calendar/connect-url')
+  async getConnectUrl(platform?: string) {
+    const query = platform ? `?platform=${platform}` : ''
+    return apiFetch<{ url: string }>(`/google-calendar/connect-url${query}`)
   },
 
   async getStatus() {
@@ -937,8 +938,9 @@ export const googleCalendarApi = {
 
 // Google Contacts API
 export const googleContactsApi = {
-  async getConnectUrl() {
-    return apiFetch<{ url: string }>('/google-contacts/connect-url')
+  async getConnectUrl(platform?: string) {
+    const query = platform ? `?platform=${platform}` : ''
+    return apiFetch<{ url: string }>(`/google-contacts/connect-url${query}`)
   },
 
   async getStatus() {

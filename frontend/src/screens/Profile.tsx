@@ -8,6 +8,7 @@ import { useLocaleStore } from '../stores/localeStore';
 import { useNotificationStore } from '../stores/notificationStore';
 import { useAuthStore } from '../stores/authStore';
 import { relationshipsApi, interactionsApi, aiApi, messagingApi, googleCalendarApi, googleContactsApi, exportApi, Relationship, Interaction, Contact } from '../services/api';
+import { Capacitor } from '@capacitor/core';
 
 interface ProfileProps {
   onNavigate: (screen: ScreenName) => void;
@@ -86,6 +87,9 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
   // Interaction detail modal state
   const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null);
 
+  // Detect native platform (Capacitor iOS/Android)
+  const isNativePlatform = Capacitor.isNativePlatform();
+
   // Fetch relationship and interactions data for this contact
   useEffect(() => {
     if (selectedContact?.id) {
@@ -150,26 +154,98 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
     }
   }, [selectedContact]);
 
-  // Check for Google Calendar OAuth redirect result
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+  // Re-fetch Google integration statuses from the API
+  const refreshGoogleStatuses = () => {
+    googleCalendarApi.getStatus().then(res => {
+      if (res.data) setGcalStatus(res.data);
+    });
+    googleContactsApi.getStatus().then(res => {
+      if (res.data) setGcontactsStatus(res.data);
+    });
+  };
+
+  // Handle OAuth redirect results (both web query params and native deep link)
+  const handleOAuthParams = (params: URLSearchParams) => {
     if (params.get('gcal_connected') === 'true') {
       setGcalStatus({ connected: true, autoSync: true });
-      window.history.replaceState({}, '', window.location.pathname);
+      // Also verify with the backend
+      googleCalendarApi.getStatus().then(res => {
+        if (res.data) setGcalStatus(res.data);
+      });
     }
     if (params.get('gcal_error')) {
       console.error('Google Calendar connect error:', params.get('gcal_error'));
-      window.history.replaceState({}, '', window.location.pathname);
     }
     if (params.get('gcontacts_connected') === 'true') {
       setGcontactsStatus({ connected: true });
-      window.history.replaceState({}, '', window.location.pathname);
+      // Also verify with the backend
+      googleContactsApi.getStatus().then(res => {
+        if (res.data) setGcontactsStatus(res.data);
+      });
     }
     if (params.get('gcontacts_error')) {
       console.error('Google Contacts connect error:', params.get('gcontacts_error'));
+    }
+
+    // Close the in-app browser if it's still open
+    if (isNativePlatform) {
+      import('@capacitor/browser').then(({ Browser }) => {
+        Browser.close();
+      }).catch(() => {});
+    }
+  };
+
+  // Check for web OAuth redirect result (query params)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    handleOAuthParams(params);
+    if (params.toString()) {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
+
+  // Listen for native deep link (warmly://profile?...) from OAuth callback
+  useEffect(() => {
+    if (!isNativePlatform) return;
+    let cleanup: (() => void) | undefined;
+    import('@capacitor/app').then(({ App }) => {
+      const listener = App.addListener('appUrlOpen', (event) => {
+        try {
+          const url = new URL(event.url);
+          handleOAuthParams(url.searchParams);
+        } catch (e) {
+          console.error('Error handling deep link:', e);
+        }
+      });
+      cleanup = () => { listener.then(l => l.remove()); };
+    }).catch(() => {
+      // Plugin not available — ignore
+    });
+    return () => { cleanup?.(); };
+  }, [isNativePlatform]);
+
+  // Re-fetch Google statuses when app resumes from background (e.g. after OAuth in-app browser)
+  useEffect(() => {
+    if (!isNativePlatform) return;
+    let cleanup: (() => void) | undefined;
+    import('@capacitor/app').then(({ App }) => {
+      const listener = App.addListener('resume', () => {
+        refreshGoogleStatuses();
+      });
+      cleanup = () => { listener.then(l => l.remove()); };
+    }).catch(() => {});
+    // Also listen for web visibility change as a fallback
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshGoogleStatuses();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      cleanup?.();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [isNativePlatform]);
 
   // LINE Linking modal countdown
   useEffect(() => {
@@ -308,11 +384,39 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
     }
   };
 
+  // Helper: open URL for OAuth
+  const openOAuthUrl = async (url: string) => {
+    if (isNativePlatform) {
+      // On native, try Capacitor Browser plugin (opens SFSafariViewController),
+      // fall back to window.open or window.location
+      try {
+        const { Browser } = await import('@capacitor/browser');
+        await Browser.open({ url });
+      } catch {
+        // Browser plugin not available — try alternatives
+        const opened = window.open(url, '_blank');
+        if (!opened) {
+          window.location.href = url;
+        }
+      }
+    } else {
+      window.location.href = url;
+    }
+  };
+
   // Google Calendar handlers
   const handleGcalConnect = async () => {
-    const res = await googleCalendarApi.getConnectUrl();
-    if (res.data?.url) {
-      window.location.href = res.data.url;
+    try {
+      const res = await googleCalendarApi.getConnectUrl(isNativePlatform ? 'native' : undefined);
+      if (res.error) {
+        console.error('Failed to get Google Calendar connect URL:', res.error);
+        return;
+      }
+      if (res.data?.url) {
+        openOAuthUrl(res.data.url);
+      }
+    } catch (err) {
+      console.error('Google Calendar connect error:', err);
     }
   };
 
@@ -332,9 +436,17 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
 
   // Google Contacts handlers
   const handleGcontactsConnect = async () => {
-    const res = await googleContactsApi.getConnectUrl();
-    if (res.data?.url) {
-      window.location.href = res.data.url;
+    try {
+      const res = await googleContactsApi.getConnectUrl(isNativePlatform ? 'native' : undefined);
+      if (res.error) {
+        console.error('Failed to get Google Contacts connect URL:', res.error);
+        return;
+      }
+      if (res.data?.url) {
+        openOAuthUrl(res.data.url);
+      }
+    } catch (err) {
+      console.error('Google Contacts connect error:', err);
     }
   };
 
@@ -1699,20 +1811,20 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
             <div className="bg-surface-card p-5 rounded-2xl shadow-sm border border-white/5">
               <h3 className="font-bold text-xs text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-blue-400 text-[16px]">calendar_month</span>
-                Google Calendar
+                {t('googleCalendar.title', 'Google Calendar')}
               </h3>
 
               {!gcalStatus?.connected ? (
                 <div className="space-y-3">
                   <p className="text-xs text-gray-400">
-                    Connect Google Calendar to automatically sync reminders and meeting follow-ups as calendar events.
+                    {t('googleCalendar.connectDescription', 'Connect Google Calendar to automatically sync reminders and meeting follow-ups as calendar events.')}
                   </p>
                   <button
                     onClick={handleGcalConnect}
                     className="w-full py-2.5 rounded-xl bg-blue-500/20 text-blue-400 text-sm font-bold border border-blue-500/30 hover:bg-blue-500/30 transition-colors flex items-center justify-center gap-2"
                   >
                     <span className="material-symbols-outlined text-[18px]">link</span>
-                    Connect Google Calendar
+                    {t('googleCalendar.connect', 'Connect Google Calendar')}
                   </button>
                 </div>
               ) : (
@@ -1723,8 +1835,8 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
                         <span className="material-symbols-outlined text-blue-400 text-[20px]">calendar_month</span>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-white">Google Calendar</p>
-                        <p className="text-xs text-green-400">Connected</p>
+                        <p className="text-sm font-medium text-white">{t('googleCalendar.title', 'Google Calendar')}</p>
+                        <p className="text-xs text-green-400">{t('googleCalendar.connected', 'Connected')}</p>
                       </div>
                     </div>
                     <button
@@ -1732,15 +1844,15 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
                       disabled={isGcalDisconnecting}
                       className="px-3 py-1.5 rounded-lg bg-red-900/20 text-red-400 text-xs font-bold border border-red-800/30 hover:bg-red-900/30 disabled:opacity-50"
                     >
-                      {isGcalDisconnecting ? '...' : 'Disconnect'}
+                      {isGcalDisconnecting ? '...' : t('googleCalendar.disconnect', 'Disconnect')}
                     </button>
                   </div>
 
                   {/* Auto-sync toggle */}
                   <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5">
                     <div>
-                      <p className="text-sm font-medium text-white">Auto-sync reminders</p>
-                      <p className="text-xs text-gray-400">New reminders & follow-ups sync automatically</p>
+                      <p className="text-sm font-medium text-white">{t('googleCalendar.autoSync', 'Auto-sync reminders')}</p>
+                      <p className="text-xs text-gray-400">{t('googleCalendar.autoSyncDescription', 'New reminders & follow-ups sync automatically')}</p>
                     </div>
                     <button
                       onClick={handleGcalAutoSyncToggle}
@@ -1761,8 +1873,8 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
               <p className="text-xs text-gray-500 mt-3 flex items-start gap-1.5">
                 <span className="material-symbols-outlined text-[14px] mt-0.5">info</span>
                 {gcalStatus?.connected
-                  ? 'Individual reminders can also be added/removed from calendar in the notification panel.'
-                  : 'Reminders and meeting follow-up action items will appear as events in your primary Google Calendar.'}
+                  ? t('googleCalendar.hintConnected', 'Individual reminders can also be added/removed from calendar in the notification panel.')
+                  : t('googleCalendar.hintDisconnected', 'Reminders and meeting follow-up action items will appear as events in your primary Google Calendar.')}
               </p>
             </div>
 

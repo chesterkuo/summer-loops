@@ -706,6 +706,17 @@
     "noContactsFound": "在您的 Google 账户中未找到联系人。",
     "hint": "电子邮件或电话号码匹配的联系人将被检测为重复并跳过。"
   },
+  "googleCalendar": {
+    "title": "Google Calendar",
+    "connect": "连接 Google Calendar",
+    "disconnect": "断开连接",
+    "connected": "已连接",
+    "connectDescription": "连接 Google Calendar 以自动将提醒和会议后续跟进同步为日历事件。",
+    "autoSync": "自动同步提醒",
+    "autoSyncDescription": "新的提醒和后续跟进会自动同步",
+    "hintConnected": "单个提醒也可以在通知面板中添加或移除日历事件。",
+    "hintDisconnected": "提醒和会议后续行动项目将显示为您主要 Google Calendar 中的事件。"
+  },
   "export": {
     "exportVcard": "导出所有联系人 (.vcf)",
     "exportAll": "全部导出",

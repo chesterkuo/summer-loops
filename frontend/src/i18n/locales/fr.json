@@ -426,6 +426,17 @@
     "noContactsFound": "Aucun contact trouvé dans votre compte Google.",
     "hint": "Les contacts avec un email ou téléphone correspondant seront détectés comme doublons et ignorés."
   },
+  "googleCalendar": {
+    "title": "Google Calendar",
+    "connect": "Connecter Google Calendar",
+    "disconnect": "Déconnecter",
+    "connected": "Connecté",
+    "connectDescription": "Connectez Google Calendar pour synchroniser automatiquement les rappels et les suivis de réunions en tant qu'événements de calendrier.",
+    "autoSync": "Synchronisation automatique des rappels",
+    "autoSyncDescription": "Les nouveaux rappels et suivis sont synchronisés automatiquement",
+    "hintConnected": "Les rappels individuels peuvent également être ajoutés ou retirés du calendrier dans le panneau de notifications.",
+    "hintDisconnected": "Les rappels et les actions de suivi de réunions apparaîtront comme des événements dans votre Google Calendar principal."
+  },
   "export": {
     "exportVcard": "Exporter Tous les Contacts (.vcf)",
     "exportAll": "Tout Exporter",

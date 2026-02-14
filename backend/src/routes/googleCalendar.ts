@@ -19,6 +19,16 @@ const FRONTEND_URL = process.env.FRONTEND_URL || (
 )
 
 const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events'
+const NATIVE_REDIRECT_SCHEME = 'warmly://profile'
+
+// For native apps, serve an HTML page that redirects via custom URL scheme
+function nativeRedirectResponse(c: any, url: string) {
+  return c.html(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{background:#122017;color:#fff;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center}
+.s{font-size:18px;margin-top:20px}a{color:#60a5fa;text-decoration:underline}</style></head>
+<body><div><div class="s">Redirecting to Warmly...</div><p style="margin-top:16px"><a href="${url}">Tap here if not redirected</a></p></div>
+<script>window.location.href="${url}";</script></body></html>`)
+}
 
 const googleCalendar = new Hono()
 
@@ -28,6 +38,7 @@ const googleCalendar = new Hono()
 // Uses a state token stored in google_calendar_tokens with access_token='pending'
 googleCalendar.get('/connect-url', authMiddleware, async (c) => {
   const userId = c.get('user').userId
+  const platform = c.req.query('platform') // 'native' for iOS/Android app
 
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
     return c.json({ error: 'Google OAuth not configured' }, 503)
@@ -36,16 +47,18 @@ googleCalendar.get('/connect-url', authMiddleware, async (c) => {
   // Create a short-lived state token
   const stateToken = generateId()
   const expiry = new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10 minutes
+  // Encode platform into scopes field so the callback knows where to redirect
+  const scopesField = platform === 'native' ? 'pending:native' : 'pending'
 
   await sql`
     INSERT INTO google_calendar_tokens (id, user_id, access_token, refresh_token, token_expiry, scopes, created_at, updated_at)
-    VALUES (${stateToken}, ${userId}, 'pending', 'pending', ${expiry}, 'pending', NOW(), NOW())
+    VALUES (${stateToken}, ${userId}, 'pending', 'pending', ${expiry}, ${scopesField}, NOW(), NOW())
     ON CONFLICT (user_id) DO UPDATE SET
       id = ${stateToken},
       access_token = 'pending',
       refresh_token = 'pending',
       token_expiry = ${expiry},
-      scopes = 'pending',
+      scopes = ${scopesField},
       updated_at = NOW()
   `
 
@@ -68,13 +81,18 @@ googleCalendar.get('/callback', async (c) => {
   const error = c.req.query('error')
   const stateToken = c.req.query('state')
 
+  // Helper: redirect to web or native depending on platform
+  const doRedirect = (url: string, isNative: boolean) => {
+    return isNative ? nativeRedirectResponse(c, url) : c.redirect(url)
+  }
+
   if (error || !code || !stateToken) {
     return c.redirect(`${FRONTEND_URL}/profile?gcal_error=${error || 'missing_code'}`)
   }
 
   // Look up user from state token
   const [pending] = await sql`
-    SELECT user_id FROM google_calendar_tokens
+    SELECT user_id, scopes FROM google_calendar_tokens
     WHERE id = ${stateToken} AND access_token = 'pending'
     AND token_expiry > NOW()
   `
@@ -82,6 +100,8 @@ googleCalendar.get('/callback', async (c) => {
     return c.redirect(`${FRONTEND_URL}/profile?gcal_error=invalid_state`)
   }
   const userId = pending.user_id
+  const isNative = pending.scopes === 'pending:native'
+  const redirectBase = isNative ? NATIVE_REDIRECT_SCHEME : `${FRONTEND_URL}/profile`
 
   try {
     // Exchange code for tokens
@@ -126,11 +146,11 @@ googleCalendar.get('/callback', async (c) => {
               updated_at = NOW()
           WHERE user_id = ${userId}
         `
-        return c.redirect(`${FRONTEND_URL}/profile?gcal_connected=true`)
+        return doRedirect(`${redirectBase}?gcal_connected=true`, isNative)
       }
       // No existing refresh token — clean up pending row and error
       await sql`DELETE FROM google_calendar_tokens WHERE user_id = ${userId} AND access_token = 'pending'`
-      return c.redirect(`${FRONTEND_URL}/profile?gcal_error=no_refresh_token`)
+      return doRedirect(`${redirectBase}?gcal_error=no_refresh_token`, isNative)
     }
 
     const now = new Date().toISOString()
@@ -148,12 +168,12 @@ googleCalendar.get('/callback', async (c) => {
       WHERE user_id = ${userId}
     `
 
-    return c.redirect(`${FRONTEND_URL}/profile?gcal_connected=true`)
+    return doRedirect(`${redirectBase}?gcal_connected=true`, isNative)
   } catch (err: any) {
     console.error('Google Calendar OAuth error:', err)
     // Clean up pending row on failure
     await sql`DELETE FROM google_calendar_tokens WHERE user_id = ${userId} AND access_token = 'pending'`
-    return c.redirect(`${FRONTEND_URL}/profile?gcal_error=auth_failed`)
+    return doRedirect(`${redirectBase}?gcal_error=auth_failed`, isNative)
   }
 })
 

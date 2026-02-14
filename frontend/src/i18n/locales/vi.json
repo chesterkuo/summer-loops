@@ -426,6 +426,17 @@
     "noContactsFound": "Không tìm thấy liên hệ trong tài khoản Google của bạn.",
     "hint": "Liên hệ có email hoặc số điện thoại trùng khớp sẽ được phát hiện là trùng lặp và bỏ qua."
   },
+  "googleCalendar": {
+    "title": "Google Calendar",
+    "connect": "Kết nối Google Calendar",
+    "disconnect": "Ngắt kết nối",
+    "connected": "Đã kết nối",
+    "connectDescription": "Kết nối Google Calendar để tự động đồng bộ nhắc nhở và theo dõi cuộc họp thành sự kiện lịch.",
+    "autoSync": "Tự động đồng bộ nhắc nhở",
+    "autoSyncDescription": "Nhắc nhở và theo dõi mới sẽ được đồng bộ tự động",
+    "hintConnected": "Các nhắc nhở riêng lẻ cũng có thể được thêm hoặc xóa khỏi lịch trong bảng thông báo.",
+    "hintDisconnected": "Nhắc nhở và các mục theo dõi cuộc họp sẽ xuất hiện dưới dạng sự kiện trong Google Calendar chính của bạn."
+  },
   "export": {
     "exportVcard": "Xuất Tất Cả Liên Hệ (.vcf)",
     "exportAll": "Xuất Tất Cả",

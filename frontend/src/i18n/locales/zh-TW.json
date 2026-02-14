@@ -706,6 +706,17 @@
     "noContactsFound": "在您的 Google 帳戶中未找到聯絡人。",
     "hint": "電子郵件或電話號碼相符的聯絡人將被偵測為重複並跳過。"
   },
+  "googleCalendar": {
+    "title": "Google Calendar",
+    "connect": "連接 Google Calendar",
+    "disconnect": "中斷連接",
+    "connected": "已連接",
+    "connectDescription": "連接 Google Calendar 以自動將提醒和會議後續追蹤同步為日曆事件。",
+    "autoSync": "自動同步提醒",
+    "autoSyncDescription": "新的提醒和後續追蹤會自動同步",
+    "hintConnected": "個別提醒也可以在通知面板中新增或移除日曆事件。",
+    "hintDisconnected": "提醒和會議後續行動項目將會顯示為您主要 Google Calendar 中的事件。"
+  },
   "export": {
     "exportVcard": "匯出所有聯絡人 (.vcf)",
     "exportAll": "全部匯出",
