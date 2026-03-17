@@ -53,7 +53,7 @@ export const useContactStore = create<ContactState>((set, get) => ({
 
   fetchContacts: async (search?: string) => {
     set({ isLoading: true, error: null })
-    const result = await contactsApi.list({ search })
+    const result = await contactsApi.list({ search, limit: 1000 })
 
     if (result.data) {
       set({

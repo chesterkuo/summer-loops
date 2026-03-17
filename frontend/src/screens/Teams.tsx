@@ -11,7 +11,7 @@ interface TeamsProps {
 
 const Teams: React.FC<TeamsProps> = ({ onNavigate }) => {
   const { t } = useTranslation();
-  const { contacts } = useContactStore();
+  const { contacts, fetchContacts } = useContactStore();
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,9 +46,10 @@ const Teams: React.FC<TeamsProps> = ({ onNavigate }) => {
   const [autoShareVisibility, setAutoShareVisibility] = useState<'basic' | 'full'>('basic');
   const [isUpdatingAutoShare, setIsUpdatingAutoShare] = useState(false);
 
-  // Fetch teams on mount
+  // Fetch teams and contacts on mount
   useEffect(() => {
     fetchTeams();
+    fetchContacts();
   }, []);
 
   const fetchTeams = async () => {
